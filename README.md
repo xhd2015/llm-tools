@@ -42,7 +42,7 @@ This is a collection of llm tools, including the ones reverse engineered from Cu
 - **Safety Features**: Basic validation to prevent dangerous commands
 - **Process Management**: Utilities for process information and control
 
-# Doc
+# Docs
 https://gist.github.com/sshh12/25ad2e40529b269a88b80e7cf1c38084
 
 https://blog.sshh.io/p/how-cursor-ai-ide-works

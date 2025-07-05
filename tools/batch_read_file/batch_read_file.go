@@ -81,22 +81,22 @@ This tool is particularly useful when you need to read multiple related files (e
 							},
 							"should_read_entire_file": {
 								Type:        jsonschema.ParamTypeString, // Note: should be boolean but keeping as string for compatibility
-								Description: "Whether to read the entire file. Defaults to false.",
+								Description: "Whether to read the entire file. When true, start_line_one_indexed and end_line_one_indexed_inclusive are ignored. When false, line range parameters are required. Defaults to false.",
 							},
 							"start_line_one_indexed": {
 								Type:        jsonschema.ParamTypeNumber,
-								Description: "The one-indexed line number to start reading from (inclusive).",
+								Description: "The one-indexed line number to start reading from (inclusive). Required when should_read_entire_file is false. Ignored when should_read_entire_file is true.",
 							},
 							"end_line_one_indexed_inclusive": {
 								Type:        jsonschema.ParamTypeNumber,
-								Description: "The one-indexed line number to end reading at (inclusive).",
+								Description: "The one-indexed line number to end reading at (inclusive). Required when should_read_entire_file is false. Ignored when should_read_entire_file is true.",
 							},
 							"max_lines": {
 								Type:        jsonschema.ParamTypeNumber,
 								Description: "Optional per-file maximum lines limit. Overrides global_max_lines for this file.",
 							},
 						},
-						Required: []string{"target_file", "should_read_entire_file", "start_line_one_indexed", "end_line_one_indexed_inclusive"},
+						Required: []string{"target_file"},
 					},
 				},
 				"global_max_lines": {
@@ -176,6 +176,23 @@ func processFileRequest(fileReq FileReadRequest, globalMaxLines, globalMinLines 
 	if fileReq.TargetFile == "" {
 		response.Error = "target_file is required"
 		return response
+	}
+
+	// Validate parameters based on should_read_entire_file
+	if !fileReq.ShouldReadEntireFile {
+		// When not reading entire file, line range parameters are required
+		if fileReq.StartLineOneIndexed == 0 && fileReq.EndLineOneIndexedInclusive == 0 {
+			response.Error = "start_line_one_indexed and end_line_one_indexed_inclusive are required when should_read_entire_file is false"
+			return response
+		}
+		if fileReq.StartLineOneIndexed <= 0 {
+			response.Error = "start_line_one_indexed must be greater than 0"
+			return response
+		}
+		if fileReq.EndLineOneIndexedInclusive <= 0 {
+			response.Error = "end_line_one_indexed_inclusive must be greater than 0"
+			return response
+		}
 	}
 
 	// Check if file exists
