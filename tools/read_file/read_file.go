@@ -54,7 +54,7 @@ Reading the entire file is not allowed in most cases. You are only allowed to re
 					Description: "The path of the file to read. You can use either a relative path in the workspace or an absolute path. If an absolute path is provided, it will be preserved as is.",
 				},
 				"should_read_entire_file": {
-					Type:        jsonschema.ParamTypeString, // Note: should be boolean but keeping as string for compatibility
+					Type:        jsonschema.ParamTypeBoolean,
 					Description: "Whether to read the entire file. Defaults to false.",
 				},
 				"start_line_one_indexed": {

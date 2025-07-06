@@ -76,7 +76,7 @@ Use the include or exclude patterns to filter the search scope by file type or s
 					Description: "The regex pattern to search for",
 				},
 				"case_sensitive": {
-					Type:        jsonschema.ParamTypeString, // Note: should be boolean but keeping as string for compatibility
+					Type:        jsonschema.ParamTypeBoolean,
 					Description: "Whether the search should be case sensitive",
 				},
 				"exclude_pattern": {

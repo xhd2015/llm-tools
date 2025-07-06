@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -14,6 +15,7 @@ import (
 
 // ListDirRequest represents the input parameters for the list_dir tool
 type ListDirRequest struct {
+	WorkspaceRoot         string `json:"workspace_root"`
 	RelativeWorkspacePath string `json:"relative_workspace_path"`
 	Explanation           string `json:"explanation"`
 }
@@ -33,6 +35,10 @@ func GetToolDefinition() defs.ToolDefinition {
 		Parameters: &jsonschema.JsonSchema{
 			Type: jsonschema.ParamTypeObject,
 			Properties: map[string]*jsonschema.JsonSchema{
+				"workspace_root": {
+					Type:        jsonschema.ParamTypeString,
+					Description: "The absolute path of the workspace root directory. This is used to resolve relative paths to files.",
+				},
 				"relative_workspace_path": {
 					Type:        jsonschema.ParamTypeString,
 					Description: "Path to list contents of, relative to the workspace root.",
@@ -42,7 +48,7 @@ func GetToolDefinition() defs.ToolDefinition {
 					Description: "One sentence explanation as to why this tool is being used, and how it contributes to the goal.",
 				},
 			},
-			Required: []string{"relative_workspace_path"},
+			Required: []string{"workspace_root", "relative_workspace_path"},
 		},
 	}
 }
@@ -51,25 +57,35 @@ func GetToolDefinition() defs.ToolDefinition {
 func ListDir(req ListDirRequest) (*ListDirResponse, error) {
 	// Validate input parameters
 	if req.RelativeWorkspacePath == "" {
-		return nil, fmt.Errorf("relative_workspace_path is required")
+		return nil, fmt.Errorf("required relative_workspace_path")
 	}
 
-	// Check if directory exists
-	if _, err := os.Stat(req.RelativeWorkspacePath); os.IsNotExist(err) {
-		return nil, fmt.Errorf("directory does not exist: %s", req.RelativeWorkspacePath)
+	opDir := req.RelativeWorkspacePath
+	if !filepath.IsAbs(req.RelativeWorkspacePath) {
+		if req.WorkspaceRoot == "" {
+			return nil, fmt.Errorf("requires workspace_root when relative_workspace_path is a relative path")
+		}
+		if !filepath.IsAbs(req.WorkspaceRoot) {
+			return nil, fmt.Errorf("workspace_root must be absolute path")
+		}
+
+		opDir = filepath.Join(req.WorkspaceRoot, req.RelativeWorkspacePath)
 	}
 
 	// Check if it's actually a directory
-	info, err := os.Stat(req.RelativeWorkspacePath)
+	info, err := os.Stat(opDir)
 	if err != nil {
-		return nil, fmt.Errorf("failed to stat path: %w", err)
+		if os.IsNotExist(err) {
+			return nil, fmt.Errorf("not exist: %s", req.RelativeWorkspacePath)
+		}
+		return nil, fmt.Errorf("stat path: %w", err)
 	}
 	if !info.IsDir() {
 		return nil, fmt.Errorf("path is not a directory: %s", req.RelativeWorkspacePath)
 	}
 
 	// Read directory contents
-	entries, err := os.ReadDir(req.RelativeWorkspacePath)
+	entries, err := os.ReadDir(opDir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read directory: %w", err)
 	}

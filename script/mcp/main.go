@@ -5,13 +5,40 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"os"
+	"strings"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
+	"github.com/xhd2015/less-gen/flags"
 	"github.com/xhd2015/llm-tools/tools/batch_read_file"
 )
 
+const help = `
+mcp-batch-read-file
+
+Usage: mcp-batch-read-file
+
+Options:
+  -h, --help                       show help
+  -v,--verbose                     show verbose info  
+
+Examples:
+  mcp-batch-read-file help         show help message
+
+  # inspect mcp
+  echo '{"jsonrpc": "2.0", "id": 2, "method": "tools/list"}' | mcp-batch-read-file
+
+Local development:
+  go build -o $GOPATH/bin/mcp-batch-read-file ./
+`
+
 func main() {
+	err := handle(os.Args[1:])
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
 	// Create a new MCP server
 	s := server.NewMCPServer(
 		"LLM Tools Batch Read File Server",
@@ -20,83 +47,23 @@ func main() {
 		server.WithRecovery(),
 	)
 
+	toolDef := batch_read_file.GetToolDefinition()
+
 	// Add the batch_read_file tool using the exact schema from batch_read_file.GetToolDefinition()
-	batchReadFileTool := mcp.NewTool("batch_read_file",
-		mcp.WithDescription(`Read the contents of multiple files in a single batch operation. This tool improves efficiency by reading multiple files at once instead of making separate read_file calls.
-Each file in the batch can have individual line range settings, and the tool respects the same line limits as read_file (max 250 lines, min 200 lines for partial reads).
-
-Key features:
-- Batch processing of multiple files
-- Individual line range control per file
-- Global and per-file line limits
-- Error handling with continue-on-error option
-- Optional outline generation
-- Structured response with success/error counts
-
-This tool is particularly useful when you need to read multiple related files (e.g., examining imports, comparing implementations, or gathering context from multiple source files).`),
+	batchReadFileTool := mcp.NewTool(toolDef.Name,
+		mcp.WithDescription(toolDef.Description),
 	)
 
-	batchReadFileTool.InputSchema.Properties = map[string]any{
-		"files": map[string]any{
-			"type":        "array",
-			"description": "Array of file read requests, each with its own target file and line range settings",
-			"items": map[string]any{
-				"type": "object",
-				"properties": map[string]any{
-					"target_file": map[string]any{
-						"type":        "string",
-						"description": "The path of the file to read. You can use either a relative path in the workspace or an absolute path.",
-					},
-					"should_read_entire_file": map[string]any{
-						"type":        "string", // Note: should be boolean but keeping as string for compatibility
-						"description": "Whether to read the entire file. When true, start_line_one_indexed and end_line_one_indexed_inclusive are ignored. When false, line range parameters are required. Defaults to false.",
-					},
-					"start_line_one_indexed": map[string]any{
-						"type":        "number",
-						"description": "The one-indexed line number to start reading from (inclusive). Required when should_read_entire_file is false. Ignored when should_read_entire_file is true.",
-					},
-					"end_line_one_indexed_inclusive": map[string]any{
-						"type":        "number",
-						"description": "The one-indexed line number to end reading at (inclusive). Required when should_read_entire_file is false. Ignored when should_read_entire_file is true.",
-					},
-					"max_lines": map[string]any{
-						"type":        "number",
-						"description": "Optional per-file maximum lines limit. Overrides global_max_lines for this file.",
-					},
-				},
-				"required": []string{"target_file"},
-			},
-		},
-		"global_max_lines": map[string]any{
-			"type":        "number",
-			"description": "Global maximum lines per file (default: 250). Can be overridden per file.",
-		},
-		"global_min_lines": map[string]any{
-			"type":        "number",
-			"description": "Global minimum lines per file for partial reads (default: 200). Applied when expanding ranges.",
-		},
-		"continue_on_error": map[string]any{
-			"type":        "string", // Note: should be boolean but keeping as string for compatibility
-			"description": "Whether to continue processing other files if one fails (default: true).",
-		},
-		"include_outline": map[string]any{
-			"type":        "string", // Note: should be boolean but keeping as string for compatibility
-			"description": "Whether to include outline in responses (default: true).",
-		},
-		"explanation": map[string]any{
-			"type":        "string",
-			"description": "One sentence explanation as to why this tool is being used, and how it contributes to the goal.",
-		},
-	}
-	batchReadFileTool.InputSchema.Required = []string{"files"}
+	batchReadFileTool.InputSchema.Type = string(toolDef.Parameters.Type)
+	batchReadFileTool.InputSchema.Required = toolDef.Parameters.Required
+	batchReadFileTool.InputSchema.Properties = toolDef.Parameters.PropertiesToMap()
 
 	// Add the tool handler
 	s.AddTool(batchReadFileTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		// Get the explanation
-		explanation, err := request.RequireString("explanation")
-		if err != nil {
-			return mcp.NewToolResultError(fmt.Sprintf("Missing required explanation: %v", err)), nil
-		}
+		explanation := request.GetString("explanation", "")
+
+		workspaceRoot := request.GetString("workspace_root", "")
 
 		// Get all arguments
 		args := request.GetArguments()
@@ -126,8 +93,9 @@ This tool is particularly useful when you need to read multiple related files (e
 
 		// Build the BatchReadFileRequest
 		req := batch_read_file.BatchReadFileRequest{
-			Files:       fileRequests,
-			Explanation: explanation,
+			WorkspaceRoot: workspaceRoot,
+			Files:         fileRequests,
+			Explanation:   explanation,
 		}
 
 		// Set optional parameters with defaults
@@ -176,6 +144,27 @@ This tool is particularly useful when you need to read multiple related files (e
 	if err := server.ServeStdio(s); err != nil {
 		log.Fatalf("Server error: %v", err)
 	}
+}
+
+func handle(args []string) error {
+	args, err := flags.New().Help("-h,--help", help).
+		Parse(args)
+	if err != nil {
+		return err
+	}
+	if len(args) > 0 {
+		cmd := args[0]
+		args = args[1:]
+		if cmd == "--help" || cmd == "help" {
+			fmt.Print(strings.TrimPrefix(help, "\n"))
+			os.Exit(0)
+			return nil
+		}
+		if len(args) > 0 {
+			return fmt.Errorf("unrecognized extra arguments: %s", strings.Join(args, ","))
+		}
+	}
+	return nil
 }
 
 // convertToFileRequests converts the files argument to []FileReadRequest

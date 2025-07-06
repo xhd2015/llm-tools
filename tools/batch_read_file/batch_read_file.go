@@ -34,6 +34,7 @@ type FileReadResponse struct {
 
 // BatchReadFileRequest represents the input parameters for the batch_read_file tool
 type BatchReadFileRequest struct {
+	WorkspaceRoot   string            `json:"workspace_root"`
 	Files           []FileReadRequest `json:"files"`
 	GlobalMaxLines  int               `json:"global_max_lines,omitempty"` // Global max lines per file (default: 250)
 	GlobalMinLines  int               `json:"global_min_lines,omitempty"` // Global min lines per file (default: 200)
@@ -69,6 +70,10 @@ This tool is particularly useful when you need to read multiple related files (e
 		Parameters: &jsonschema.JsonSchema{
 			Type: jsonschema.ParamTypeObject,
 			Properties: map[string]*jsonschema.JsonSchema{
+				"workspace_root": {
+					Type:        jsonschema.ParamTypeString,
+					Description: "The absolute path of the workspace root directory. This is used to resolve relative paths to files.",
+				},
 				"files": {
 					Type:        jsonschema.ParamTypeArray,
 					Description: "Array of file read requests, each with its own target file and line range settings",
@@ -80,7 +85,7 @@ This tool is particularly useful when you need to read multiple related files (e
 								Description: "The path of the file to read. You can use either a relative path in the workspace or an absolute path.",
 							},
 							"should_read_entire_file": {
-								Type:        jsonschema.ParamTypeString, // Note: should be boolean but keeping as string for compatibility
+								Type:        jsonschema.ParamTypeBoolean,
 								Description: "Whether to read the entire file. When true, start_line_one_indexed and end_line_one_indexed_inclusive are ignored. When false, line range parameters are required. Defaults to false.",
 							},
 							"start_line_one_indexed": {
@@ -108,11 +113,11 @@ This tool is particularly useful when you need to read multiple related files (e
 					Description: "Global minimum lines per file for partial reads (default: 200). Applied when expanding ranges.",
 				},
 				"continue_on_error": {
-					Type:        jsonschema.ParamTypeString, // Note: should be boolean but keeping as string for compatibility
+					Type:        jsonschema.ParamTypeBoolean,
 					Description: "Whether to continue processing other files if one fails (default: true).",
 				},
 				"include_outline": {
-					Type:        jsonschema.ParamTypeString, // Note: should be boolean but keeping as string for compatibility
+					Type:        jsonschema.ParamTypeBoolean,
 					Description: "Whether to include outline in responses (default: true).",
 				},
 				"explanation": {
@@ -120,7 +125,7 @@ This tool is particularly useful when you need to read multiple related files (e
 					Description: "One sentence explanation as to why this tool is being used, and how it contributes to the goal.",
 				},
 			},
-			Required: []string{"files"},
+			Required: []string{"workspace_root", "files"},
 		},
 	}
 }
@@ -145,7 +150,7 @@ func BatchReadFile(req BatchReadFileRequest) (*BatchReadFileResponse, error) {
 	errorCount := 0
 
 	for _, fileReq := range req.Files {
-		response := processFileRequest(fileReq, req.GlobalMaxLines, req.GlobalMinLines, req.IncludeOutline)
+		response := processFileRequest(req.WorkspaceRoot, fileReq, req.GlobalMaxLines, req.GlobalMinLines, req.IncludeOutline)
 		responses = append(responses, response)
 
 		if response.Error != "" {
@@ -167,7 +172,7 @@ func BatchReadFile(req BatchReadFileRequest) (*BatchReadFileResponse, error) {
 }
 
 // processFileRequest processes a single file read request
-func processFileRequest(fileReq FileReadRequest, globalMaxLines, globalMinLines int, includeOutline bool) FileReadResponse {
+func processFileRequest(workspaceRoot string, fileReq FileReadRequest, globalMaxLines, globalMinLines int, includeOutline bool) FileReadResponse {
 	response := FileReadResponse{
 		TargetFile: fileReq.TargetFile,
 	}
@@ -195,14 +200,23 @@ func processFileRequest(fileReq FileReadRequest, globalMaxLines, globalMinLines 
 		}
 	}
 
+	filePath := fileReq.TargetFile
+	if !filepath.IsAbs(filePath) {
+		if workspaceRoot == "" {
+			response.Error = "workspace_root is required when target_file is a relative path"
+			return response
+		}
+		filePath = filepath.Join(workspaceRoot, filePath)
+	}
+
 	// Check if file exists
-	if _, err := os.Stat(fileReq.TargetFile); os.IsNotExist(err) {
-		response.Error = fmt.Sprintf("file does not exist: %s", fileReq.TargetFile)
+	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		response.Error = fmt.Sprintf("file does not exist: %s", filePath)
 		return response
 	}
 
 	// Open and read the file
-	file, err := os.Open(fileReq.TargetFile)
+	file, err := os.Open(filePath)
 	if err != nil {
 		response.Error = fmt.Sprintf("failed to open file: %v", err)
 		return response

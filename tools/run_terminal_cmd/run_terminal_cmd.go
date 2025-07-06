@@ -63,7 +63,7 @@ In using these tools, adhere to the following guidelines:
 					Description: "The terminal command to execute",
 				},
 				"is_background": {
-					Type:        jsonschema.ParamTypeString, // Note: should be boolean but keeping as string for compatibility
+					Type:        jsonschema.ParamTypeBoolean,
 					Description: "Whether the command should be run in the background",
 				},
 				"explanation": {
