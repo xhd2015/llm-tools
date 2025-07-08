@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -15,6 +14,7 @@ import (
 
 // ReadFileRequest represents the input parameters for the read_file tool
 type ReadFileRequest struct {
+	WorkspaceRoot              string `json:"workspace_root"`
 	TargetFile                 string `json:"target_file"`
 	ShouldReadEntireFile       bool   `json:"should_read_entire_file"`
 	StartLineOneIndexed        int    `json:"start_line_one_indexed"`
@@ -49,6 +49,10 @@ Reading the entire file is not allowed in most cases. You are only allowed to re
 		Parameters: &jsonschema.JsonSchema{
 			Type: jsonschema.ParamTypeObject,
 			Properties: map[string]*jsonschema.JsonSchema{
+				"workspace_root": {
+					Type:        jsonschema.ParamTypeString,
+					Description: "The absolute path of the workspace root directory. This is used to resolve relative paths to files.",
+				},
 				"target_file": {
 					Type:        jsonschema.ParamTypeString,
 					Description: "The path of the file to read. You can use either a relative path in the workspace or an absolute path. If an absolute path is provided, it will be preserved as is.",
@@ -82,13 +86,21 @@ func ReadFile(req ReadFileRequest) (*ReadFileResponse, error) {
 		return nil, fmt.Errorf("target_file is required")
 	}
 
+	filePath := req.TargetFile
+	if !filepath.IsAbs(filePath) {
+		if req.WorkspaceRoot == "" {
+			return nil, fmt.Errorf("workspace_root is required when target_file is a relative path")
+		}
+		filePath = filepath.Join(req.WorkspaceRoot, filePath)
+	}
+
 	// Check if file exists
-	if _, err := os.Stat(req.TargetFile); os.IsNotExist(err) {
+	if _, err := os.Stat(filePath); os.IsNotExist(err) {
 		return nil, fmt.Errorf("file does not exist: %s", req.TargetFile)
 	}
 
 	// Open and read the file
-	file, err := os.Open(req.TargetFile)
+	file, err := os.Open(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open file: %w", err)
 	}
@@ -370,6 +382,14 @@ func generateGenericOutline(lines []string) string {
 	return strings.Join(outline, "; ")
 }
 
+func ParseJSONRequest(jsonInput string) (ReadFileRequest, error) {
+	var req ReadFileRequest
+	if err := json.Unmarshal([]byte(jsonInput), &req); err != nil {
+		return ReadFileRequest{}, fmt.Errorf("failed to parse JSON input: %w", err)
+	}
+	return req, nil
+}
+
 // ExecuteFromJSON executes the read_file tool from JSON input
 func ExecuteFromJSON(jsonInput string) (string, error) {
 	var req ReadFileRequest
@@ -388,39 +408,4 @@ func ExecuteFromJSON(jsonInput string) (string, error) {
 	}
 
 	return string(jsonOutput), nil
-}
-
-// Main function for standalone execution
-func main() {
-	if len(os.Args) < 2 {
-		fmt.Println("Usage: read_file <json_input>")
-		os.Exit(1)
-	}
-
-	jsonInput := os.Args[1]
-
-	// If it's a file path, read the JSON from file
-	if strings.HasSuffix(jsonInput, ".json") {
-		file, err := os.Open(jsonInput)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error opening JSON file: %v\n", err)
-			os.Exit(1)
-		}
-		defer file.Close()
-
-		jsonBytes, err := io.ReadAll(file)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error reading JSON file: %v\n", err)
-			os.Exit(1)
-		}
-		jsonInput = string(jsonBytes)
-	}
-
-	output, err := ExecuteFromJSON(jsonInput)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		os.Exit(1)
-	}
-
-	fmt.Println(output)
 }

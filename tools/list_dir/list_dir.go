@@ -3,11 +3,9 @@ package list_dir
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"sort"
-	"strings"
 
 	"github.com/xhd2015/llm-tools/jsonschema"
 	"github.com/xhd2015/llm-tools/tools/defs"
@@ -116,6 +114,14 @@ func ListDir(req ListDirRequest) (*ListDirResponse, error) {
 	}, nil
 }
 
+func ParseJSONRequest(jsonInput string) (ListDirRequest, error) {
+	var req ListDirRequest
+	if err := json.Unmarshal([]byte(jsonInput), &req); err != nil {
+		return ListDirRequest{}, fmt.Errorf("failed to parse JSON input: %w", err)
+	}
+	return req, nil
+}
+
 // ExecuteFromJSON executes the list_dir tool from JSON input
 func ExecuteFromJSON(jsonInput string) (string, error) {
 	var req ListDirRequest
@@ -134,39 +140,4 @@ func ExecuteFromJSON(jsonInput string) (string, error) {
 	}
 
 	return string(jsonOutput), nil
-}
-
-// Main function for standalone execution
-func main() {
-	if len(os.Args) < 2 {
-		fmt.Println("Usage: list_dir <json_input>")
-		os.Exit(1)
-	}
-
-	jsonInput := os.Args[1]
-
-	// If it's a file path, read the JSON from file
-	if strings.HasSuffix(jsonInput, ".json") {
-		file, err := os.Open(jsonInput)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error opening JSON file: %v\n", err)
-			os.Exit(1)
-		}
-		defer file.Close()
-
-		jsonBytes, err := io.ReadAll(file)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error reading JSON file: %v\n", err)
-			os.Exit(1)
-		}
-		jsonInput = string(jsonBytes)
-	}
-
-	output, err := ExecuteFromJSON(jsonInput)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		os.Exit(1)
-	}
-
-	fmt.Println(output)
 }

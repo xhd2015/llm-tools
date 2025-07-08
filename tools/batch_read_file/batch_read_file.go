@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -528,6 +527,14 @@ func generateGenericOutline(lines []string) string {
 	return strings.Join(outline, "; ")
 }
 
+func ParseJSONRequest(jsonInput string) (BatchReadFileRequest, error) {
+	var req BatchReadFileRequest
+	if err := json.Unmarshal([]byte(jsonInput), &req); err != nil {
+		return BatchReadFileRequest{}, fmt.Errorf("failed to parse JSON input: %w", err)
+	}
+	return req, nil
+}
+
 // ExecuteFromJSON executes the batch_read_file tool from JSON input
 func ExecuteFromJSON(jsonInput string) (string, error) {
 	var req BatchReadFileRequest
@@ -546,39 +553,4 @@ func ExecuteFromJSON(jsonInput string) (string, error) {
 	}
 
 	return string(jsonOutput), nil
-}
-
-// Main function for standalone execution
-func main() {
-	if len(os.Args) < 2 {
-		fmt.Println("Usage: batch_read_file <json_input>")
-		os.Exit(1)
-	}
-
-	jsonInput := os.Args[1]
-
-	// If it's a file path, read the JSON from file
-	if strings.HasSuffix(jsonInput, ".json") {
-		file, err := os.Open(jsonInput)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error opening JSON file: %v\n", err)
-			os.Exit(1)
-		}
-		defer file.Close()
-
-		jsonBytes, err := io.ReadAll(file)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error reading JSON file: %v\n", err)
-			os.Exit(1)
-		}
-		jsonInput = string(jsonBytes)
-	}
-
-	output, err := ExecuteFromJSON(jsonInput)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		os.Exit(1)
-	}
-
-	fmt.Println(output)
 }

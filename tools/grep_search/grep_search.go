@@ -3,7 +3,6 @@ package grep_search
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"regexp"
@@ -382,6 +381,13 @@ func parseSimpleRipgrepOutput(output string) ([]GrepSearchMatch, error) {
 
 	return matches, nil
 }
+func ParseJSONRequest(jsonInput string) (GrepSearchRequest, error) {
+	var req GrepSearchRequest
+	if err := json.Unmarshal([]byte(jsonInput), &req); err != nil {
+		return GrepSearchRequest{}, fmt.Errorf("failed to parse JSON input: %w", err)
+	}
+	return req, nil
+}
 
 // ExecuteFromJSON executes the grep_search tool from JSON input
 func ExecuteFromJSON(jsonInput string) (string, error) {
@@ -435,40 +441,4 @@ func EscapeRegexSpecialChars(literal string) string {
 // GetWorkingDirectory returns the current working directory for search context
 func GetWorkingDirectory() (string, error) {
 	return os.Getwd()
-}
-
-// Main function for standalone execution
-func main() {
-	if len(os.Args) < 2 {
-		fmt.Println("Usage: grep_search <json_input>")
-		fmt.Println("Example: grep_search '{\"query\":\"function\",\"case_sensitive\":false}'")
-		os.Exit(1)
-	}
-
-	jsonInput := os.Args[1]
-
-	// If it's a file path, read the JSON from file
-	if strings.HasSuffix(jsonInput, ".json") {
-		file, err := os.Open(jsonInput)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error opening JSON file: %v\n", err)
-			os.Exit(1)
-		}
-		defer file.Close()
-
-		jsonBytes, err := io.ReadAll(file)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error reading JSON file: %v\n", err)
-			os.Exit(1)
-		}
-		jsonInput = string(jsonBytes)
-	}
-
-	output, err := ExecuteFromJSON(jsonInput)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		os.Exit(1)
-	}
-
-	fmt.Println(output)
 }
