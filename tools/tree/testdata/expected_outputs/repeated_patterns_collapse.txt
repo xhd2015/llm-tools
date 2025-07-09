@@ -1,0 +1,5 @@
+repeated_patterns
+├── 0_test (3 times)
+│   └── data.txt
+├── 3_test
+└── 4_test

@@ -1,0 +1,10 @@
+basic_structure
+├── dir1
+│   ├── sub1.txt
+│   └── sub2.go
+├── dir2
+│   └── sub3.md
+├── dir3
+├── file1.txt
+├── file2.go
+└── file3.json

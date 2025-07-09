@@ -1,0 +1,4 @@
+basic_structure
+├── dir1
+├── dir2
+└── dir3
