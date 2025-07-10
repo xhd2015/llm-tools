@@ -1,7 +1,6 @@
 package tree
 
 import (
-	"reflect"
 	"testing"
 
 	"github.com/xhd2015/xgo/support/assert"
@@ -27,8 +26,8 @@ func TestCollapseNoCollapse(t *testing.T) {
 	}
 
 	result := Collapse(input, opts)
-	if !reflect.DeepEqual(result, expected) {
-		t.Errorf("Collapse() result mismatch:\nGot: %+v\nWant: %+v", result, expected)
+	if diff := assert.Diff(expected, result); diff != "" {
+		t.Errorf("Collapse() result mismatch:\n%s", diff)
 	}
 }
 
@@ -96,7 +95,7 @@ func TestCollapseRepeated(t *testing.T) {
 			opts := CollapseOptions{CollapseRepeated: true}
 			result := Collapse(tt.input, opts)
 			if diff := assert.Diff(tt.expected, result); diff != "" {
-				t.Errorf("Collapse(): %s", diff)
+				t.Errorf("Collapse() result mismatch:\n%s", diff)
 			}
 		})
 	}
@@ -146,7 +145,7 @@ func TestCollapsePattern(t *testing.T) {
 
 	result := Collapse(input, opts)
 	if diff := assert.Diff(expected, result); diff != "" {
-		t.Errorf("Collapse(): %s", diff)
+		t.Errorf("Collapse() result mismatch:\n%s", diff)
 	}
 }
 
@@ -311,7 +310,7 @@ func TestCollapseRepeatedAndPattern(t *testing.T) {
 			opts := CollapseOptions{CollapseRepeated: true, CollapsePattern: true}
 			result := Collapse(tt.input, opts)
 			if diff := assert.Diff(tt.expected, result); diff != "" {
-				t.Errorf("Collapse(): %s", diff)
+				t.Errorf("Collapse() result mismatch:\n%s", diff)
 			}
 		})
 	}
@@ -542,7 +541,287 @@ func TestAdvancedPatternCollapsing(t *testing.T) {
 			opts := CollapseOptions{CollapseRepeated: true, CollapsePattern: true}
 			result := Collapse(tt.input, opts)
 			if diff := assert.Diff(tt.expected, result); diff != "" {
-				t.Errorf("Collapse() for %s:\n%s\nDescription: %s", tt.name, diff, tt.description)
+				t.Errorf("Collapse() for %s result mismatch:\n%s\nDescription: %s", tt.name, diff, tt.description)
+			}
+		})
+	}
+}
+
+func TestCollapseLeaf(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    Item
+		expected Item
+	}{
+		{
+			name: "simple_leaf_collapse",
+			input: Item{
+				Name:  "root",
+				Index: 0,
+				Children: []Item{
+					{Name: "LeafA", Index: 1, Children: nil},
+					{Name: "LeafB", Index: 2, Children: nil},
+					{Name: "LeafA", Index: 3, Children: nil},
+					{Name: "LeafC", Index: 4, Children: nil},
+					{Name: "LeafA", Index: 5, Children: nil},
+				},
+			},
+			expected: Item{
+				Name:                  "root",
+				Index:                 0,
+				CollapsedLeafChildren: 2,
+				Children: []Item{
+					{Name: "LeafA", Index: 1, Children: nil},
+					{Name: "LeafB", Index: 2, Children: nil},
+					{Name: "LeafC", Index: 4, Children: nil},
+				},
+			},
+		},
+		{
+			name: "nested_leaf_collapse",
+			input: Item{
+				Name:  "root",
+				Index: 0,
+				Children: []Item{
+					{Name: "Parent1", Index: 1, Children: []Item{
+						{Name: "Child1", Index: 1, Children: nil},
+						{Name: "Child2", Index: 2, Children: nil},
+						{Name: "Child1", Index: 3, Children: nil},
+					}},
+					{Name: "Parent2", Index: 2, Children: []Item{
+						{Name: "Child3", Index: 1, Children: nil},
+						{Name: "Child4", Index: 2, Children: nil},
+						{Name: "Child3", Index: 3, Children: nil},
+						{Name: "Child4", Index: 4, Children: nil},
+					}},
+				},
+			},
+			expected: Item{
+				Name:  "root",
+				Index: 0,
+				Children: []Item{
+					{Name: "Parent1", Index: 1, CollapsedLeafChildren: 1, Children: []Item{
+						{Name: "Child1", Index: 1, Children: nil},
+						{Name: "Child2", Index: 2, Children: nil},
+					}},
+					{Name: "Parent2", Index: 2, CollapsedLeafChildren: 2, Children: []Item{
+						{Name: "Child3", Index: 1, Children: nil},
+						{Name: "Child4", Index: 2, Children: nil},
+					}},
+				},
+			},
+		},
+		{
+			name: "mixed_leaf_and_non_leaf",
+			input: Item{
+				Name:  "root",
+				Index: 0,
+				Children: []Item{
+					{Name: "LeafA", Index: 1, Children: nil},
+					{Name: "Parent1", Index: 2, Children: []Item{
+						{Name: "Child1", Index: 1, Children: nil},
+					}},
+					{Name: "LeafA", Index: 3, Children: nil},
+					{Name: "LeafB", Index: 4, Children: nil},
+					{Name: "Parent2", Index: 5, Children: []Item{
+						{Name: "Child2", Index: 1, Children: nil},
+					}},
+				},
+			},
+			expected: Item{
+				Name:                  "root",
+				Index:                 0,
+				CollapsedLeafChildren: 1,
+				Children: []Item{
+					{Name: "LeafA", Index: 1, Children: nil},
+					{Name: "Parent1", Index: 2, Children: []Item{
+						{Name: "Child1", Index: 1, Children: nil},
+					}},
+					{Name: "LeafB", Index: 4, Children: nil},
+					{Name: "Parent2", Index: 5, Children: []Item{
+						{Name: "Child2", Index: 1, Children: nil},
+					}},
+				},
+			},
+		},
+		{
+			name: "all_children_collapsed_treated_as_leaf",
+			input: Item{
+				Name:  "root",
+				Index: 0,
+				Children: []Item{
+					{Name: "Parent1", Index: 1, Children: []Item{
+						{Name: "Child1", Index: 1, Children: nil},
+						{Name: "Child1", Index: 2, Children: nil},
+					}},
+					{Name: "Parent2", Index: 2, Children: []Item{
+						{Name: "Child2", Index: 1, Children: nil},
+					}},
+					{Name: "Parent1", Index: 3, Children: []Item{
+						{Name: "Child1", Index: 3, Children: nil},
+						{Name: "Child1", Index: 4, Children: nil},
+					}},
+				},
+			},
+			expected: Item{
+				Name:                  "root",
+				Index:                 0,
+				CollapsedLeafChildren: 1,
+				Children: []Item{
+					{Name: "Parent1", Index: 1, CollapsedLeafChildren: 1, Children: []Item{
+						{Name: "Child1", Index: 1, Children: nil},
+					}},
+					{Name: "Parent2", Index: 2, Children: []Item{
+						{Name: "Child2", Index: 1, Children: nil},
+					}},
+				},
+			},
+		},
+		{
+			name: "deep_nested_leaf_collapse",
+			input: Item{
+				Name:  "root",
+				Index: 0,
+				Children: []Item{
+					{Name: "Level1", Index: 1, Children: []Item{
+						{Name: "Level2", Index: 1, Children: []Item{
+							{Name: "DeepLeaf1", Index: 1, Children: nil},
+							{Name: "DeepLeaf2", Index: 2, Children: nil},
+							{Name: "DeepLeaf1", Index: 3, Children: nil},
+						}},
+					}},
+					{Name: "Level1Other", Index: 2, Children: []Item{
+						{Name: "OtherLeaf", Index: 1, Children: nil},
+					}},
+				},
+			},
+			expected: Item{
+				Name:  "root",
+				Index: 0,
+				Children: []Item{
+					{Name: "Level1", Index: 1, Children: []Item{
+						{Name: "Level2", Index: 1, CollapsedLeafChildren: 1, Children: []Item{
+							{Name: "DeepLeaf1", Index: 1, Children: nil},
+							{Name: "DeepLeaf2", Index: 2, Children: nil},
+						}},
+					}},
+					{Name: "Level1Other", Index: 2, Children: []Item{
+						{Name: "OtherLeaf", Index: 1, Children: nil},
+					}},
+				},
+			},
+		},
+		{
+			name: "no_duplicates",
+			input: Item{
+				Name:  "root",
+				Index: 0,
+				Children: []Item{
+					{Name: "LeafA", Index: 1, Children: nil},
+					{Name: "LeafB", Index: 2, Children: nil},
+					{Name: "LeafC", Index: 3, Children: nil},
+				},
+			},
+			expected: Item{
+				Name:  "root",
+				Index: 0,
+				Children: []Item{
+					{Name: "LeafA", Index: 1, Children: nil},
+					{Name: "LeafB", Index: 2, Children: nil},
+					{Name: "LeafC", Index: 3, Children: nil},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			opts := CollapseOptions{CollapseLeaf: true}
+			result := Collapse(tt.input, opts)
+			if diff := assert.Diff(tt.expected, result); diff != "" {
+				t.Errorf("Collapse() result mismatch:\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestCollapseLeafWithOtherOptions(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    Item
+		opts     CollapseOptions
+		expected Item
+	}{
+		{
+			name: "leaf_with_repeated",
+			input: Item{
+				Name:  "root",
+				Index: 0,
+				Children: []Item{
+					{Name: "LeafA", Index: 1, Children: nil},
+					{Name: "LeafA", Index: 2, Children: nil},
+					{Name: "LeafA", Index: 3, Children: nil},
+					{Name: "LeafB", Index: 4, Children: nil},
+					{Name: "LeafA", Index: 5, Children: nil},
+				},
+			},
+			opts: CollapseOptions{CollapseLeaf: true, CollapseRepeated: true},
+			expected: Item{
+				Name:                  "root",
+				Index:                 0,
+				CollapsedLeafChildren: 1,
+				Children: []Item{
+					{Name: "LeafA", Index: 1, SubsequentRepeated: 2, Children: nil},
+					{Name: "LeafB", Index: 4, Children: nil},
+				},
+			},
+		},
+		{
+			name: "leaf_with_pattern",
+			input: Item{
+				Name:  "root",
+				Index: 0,
+				Children: []Item{
+					{Name: "Parent1", Index: 1, Children: []Item{
+						{Name: "Child1", Index: 1, Children: nil},
+						{Name: "Child2", Index: 2, Children: nil},
+					}},
+					{Name: "Parent2", Index: 2, Children: []Item{
+						{Name: "Child3", Index: 1, Children: nil},
+					}},
+					{Name: "Parent1", Index: 3, Children: []Item{
+						{Name: "Child1", Index: 3, Children: nil},
+						{Name: "Child2", Index: 4, Children: nil},
+					}},
+					{Name: "LeafA", Index: 4, Children: nil},
+					{Name: "LeafA", Index: 5, Children: nil},
+				},
+			},
+			opts: CollapseOptions{CollapseLeaf: true, CollapsePattern: true},
+			expected: Item{
+				Name:                  "root",
+				Index:                 0,
+				CollapsedLeafChildren: 1,
+				Children: []Item{
+					{Name: "Parent1", Index: 1, Children: []Item{
+						{Name: "Child1", Index: 1, Children: nil},
+						{Name: "Child2", Index: 2, Children: nil},
+					}},
+					{Name: "Parent2", Index: 2, Children: []Item{
+						{Name: "Child3", Index: 1, Children: nil},
+					}},
+					{Name: "Parent1", Index: 3, CollapsedPatternChildren: 2, Children: nil},
+					{Name: "LeafA", Index: 4, Children: nil},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := Collapse(tt.input, tt.opts)
+			if diff := assert.Diff(tt.expected, result); diff != "" {
+				t.Errorf("Collapse() result mismatch:\n%s", diff)
 			}
 		})
 	}

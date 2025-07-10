@@ -26,6 +26,14 @@ func PrintItem(item Item) string {
 	return result.String()
 }
 
+func addCollapsedInfo(name string, item Item) string {
+	totalCollapsed := item.CollapsedPatternChildren + item.CollapsedLeafChildren
+	if totalCollapsed > 0 {
+		name = fmt.Sprintf("%s (...%d collapsed)", name, totalCollapsed)
+	}
+	return name
+}
+
 // printItem recursively prints an item and its children with proper tree formatting
 func printItem(item Item, prefix string, isLast bool, result *strings.Builder) {
 	// Build the item name with additional info
@@ -36,10 +44,7 @@ func printItem(item Item, prefix string, isLast bool, result *strings.Builder) {
 		name = fmt.Sprintf("%s (%d times)", name, item.SubsequentRepeated+1)
 	}
 
-	// Add collapsed pattern indicator
-	if item.CollapsedPatternChildren > 0 {
-		name = fmt.Sprintf("%s (...%d collapsed)", name, item.CollapsedPatternChildren)
-	}
+	name = addCollapsedInfo(name, item)
 
 	// Determine the connector symbol
 	var connector string
@@ -89,10 +94,7 @@ func printItemWithConnector(item Item, prefix string, isLast bool, result *strin
 		name = fmt.Sprintf("%s (%d times)", name, item.SubsequentRepeated+1)
 	}
 
-	// Add collapsed pattern indicator
-	if item.CollapsedPatternChildren > 0 {
-		name = fmt.Sprintf("%s (...%d collapsed)", name, item.CollapsedPatternChildren)
-	}
+	name = addCollapsedInfo(name, item)
 
 	// Always use connectors
 	var connector string
@@ -149,9 +151,7 @@ func PrintItemCompact(item Item) string {
 		name = fmt.Sprintf("%s (%d times)", name, item.SubsequentRepeated+1)
 	}
 
-	if item.CollapsedPatternChildren > 0 {
-		name = fmt.Sprintf("%s(...%d)", name, item.CollapsedPatternChildren)
-	}
+	name = addCollapsedInfo(name, item)
 
 	if len(item.Children) > 0 {
 		var childNames []string

@@ -3,13 +3,26 @@ package tree
 import (
 	"crypto/md5"
 	"encoding/hex"
+	"fmt"
 )
+
+// collapse try to minimize the output size
+// while maximizing the uniqueness of each entry
+//
+// test tokenize: https://platform.openai.com/tokenizer
+//
+// some test data:
+//   base: 263173 chars, 84099 tokens
+//   legacy(collapse repeated+pattern): 123297 chars, 37522 tokens
+//   new leaf: 64099 chars, 19010 tokens
 
 type CollapseOptions struct {
 	// CollapseRepeated collapses repeated entries into a single entry with count
 	CollapseRepeated bool
 	// CollapsePattern collapses duplicate patterns, showing full structure only for first appearance
 	CollapsePattern bool
+	// CollapseLeaf collapses duplicate leaf items by adding to parent's CollapsedPatternChildren
+	CollapseLeaf bool
 	// CollapsedDirs are directories that should be collapsed
 	CollapsedDirs []string
 }
@@ -52,6 +65,8 @@ func recomputePatterns(items []internalItem) {
 	compute = func(item *internalItem) string {
 		h := md5.New()
 		h.Write([]byte(item.item.Name))
+		// Include CollapsedPatternChildren in the pattern
+		h.Write([]byte(fmt.Sprintf("%d", item.item.CollapsedPatternChildren)))
 		for i := 0; i < len(item.children); i++ {
 			sub := compute(&item.children[i])
 			h.Write([]byte(sub))
@@ -69,8 +84,9 @@ func recomputePatterns(items []internalItem) {
 func Collapse(item Item, opts CollapseOptions) Item {
 	collapsePattern := opts.CollapsePattern
 	collapseRepeated := opts.CollapseRepeated
+	collapseLeaf := opts.CollapseLeaf
 
-	if !collapsePattern && !collapseRepeated {
+	if !collapsePattern && !collapseRepeated && !collapseLeaf {
 		return item
 	}
 	if len(item.Children) == 0 {
@@ -91,6 +107,13 @@ func Collapse(item Item, opts CollapseOptions) Item {
 	if collapsePattern {
 		collapsePatternItems(children)
 	}
+
+	if collapseLeaf {
+		originalLen := len(children)
+		children = collapseLeafItems(children)
+		result.CollapsedLeafChildren += originalLen - len(children)
+	}
+
 	if len(opts.CollapsedDirs) > 0 {
 		collapseByNames(children, opts.CollapsedDirs)
 	}
@@ -274,4 +297,107 @@ func collapseByNames(items []internalItem, collapsedDirs []string) {
 	for i := 0; i < len(items); i++ {
 		collapse(&items[i])
 	}
+}
+
+// collapseLeafItems collapses duplicate leaf items by adding to parent's CollapsedPatternChildren
+
+// uniq:
+//
+//	leaf: only-once
+//	non-leaf: parent-child only once
+func collapseLeafItems(items []internalItem) []internalItem {
+	// Process all items and handle collapsed count tracking
+	leafPatterns := make(map[string]bool)
+
+	callPatterns := make(map[string]map[string]bool)
+
+	var processLevel func(parent string, items []internalItem) ([]internalItem, int)
+	processLevel = func(parent string, items []internalItem) ([]internalItem, int) {
+		var newItems []internalItem
+
+		for _, item := range items {
+			newItem := item
+
+			// First, recursively process children
+			if len(newItem.children) > 0 {
+				newChildren, childCollapsedCount := processLevel(item.item.Name, newItem.children)
+				newItem.children = newChildren
+				newItem.item.CollapsedLeafChildren += childCollapsedCount
+			}
+
+			newItems = append(newItems, newItem)
+		}
+
+		// Recompute patterns after processing children
+		// recomputePatterns(newItems)
+
+		// Now collapse leaf items at this level
+		var finalItems []internalItem
+		collapsedLeafCount := 0
+
+		for _, item := range newItems {
+			isLeaf := len(item.children) == 0
+
+			// If all children are leaves and parent has collapsed children, treat as leaf
+			if !isLeaf && (item.item.CollapsedLeafChildren+item.item.CollapsedPatternChildren) > 0 {
+				allChildrenAreLeaves := true
+				for _, child := range item.children {
+					if len(child.children) > 0 {
+						allChildrenAreLeaves = false
+						break
+					}
+				}
+				if allChildrenAreLeaves && len(item.children) > 0 {
+					isLeaf = true
+				}
+			}
+			itemName := item.item.Name
+			shouldKeep := true
+			if isLeaf {
+				if leafPatterns[itemName] {
+					// Duplicate leaf, collapse it
+					shouldKeep = false
+				} else {
+					// First occurrence of this leaf pattern
+					leafPatterns[itemName] = true
+				}
+			} else {
+				// check parent-child repetition
+				if parent != "" {
+					parentCallMapping := callPatterns[parent]
+					if parentCallMapping == nil {
+						parentCallMapping = make(map[string]bool)
+						callPatterns[parent] = parentCallMapping
+					}
+					if parentCallMapping[itemName] {
+						shouldKeep = false
+					}
+					parentCallMapping[itemName] = true
+				}
+			}
+			if !shouldKeep {
+				// find previous matching item
+				var found bool
+				n := len(finalItems)
+				for i := n - 1; i >= 0; i-- {
+					finalItem := &finalItems[i]
+					if finalItem.item.Name == itemName {
+						finalItem.item.SubsequentRepeated++
+						found = true
+						break
+					}
+				}
+				if !found {
+					collapsedLeafCount++
+				}
+			} else {
+				finalItems = append(finalItems, item)
+			}
+		}
+
+		return finalItems, collapsedLeafCount
+	}
+
+	result, _ := processLevel("", items)
+	return result
 }

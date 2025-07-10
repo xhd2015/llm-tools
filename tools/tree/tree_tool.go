@@ -30,6 +30,7 @@ Examples:
 func HandleCli(args []string) error {
 	var collapsePattern bool
 	var collapseRepeated bool
+	var collapseLeaf bool
 	var collapse bool
 
 	var collapseDir []string
@@ -41,6 +42,7 @@ func HandleCli(args []string) error {
 	var findPath string
 	args, err := flags.Bool("--collapse-pattern", &collapsePattern).
 		Bool("--collapse-repeated", &collapseRepeated).
+		Bool("--collapse-leaf", &collapseLeaf).
 		Bool("--collapse", &collapse).
 		StringSlice("--collapse-dir", &collapseDir).
 		StringSlice("--exclude", &exclude).
@@ -68,6 +70,7 @@ func HandleCli(args []string) error {
 	if collapse {
 		collapseRepeated = true
 		collapsePattern = true
+		collapseLeaf = true
 	}
 
 	item, err := traverseTreeItem(dir, TreeOptions{
@@ -77,6 +80,7 @@ func HandleCli(args []string) error {
 		CollapseRepeated: collapseRepeated,
 		CollapsePattern:  collapsePattern,
 		CollapsedDirs:    collapseDir,
+		CollapseLeaf:     collapseLeaf,
 	})
 	if err != nil {
 		return err

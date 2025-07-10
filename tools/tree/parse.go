@@ -16,6 +16,7 @@ type Item struct {
 	SubsequentRepeated int
 	// Number of children that were collapsed due to pattern matching (0 = no pattern collapse)
 	CollapsedPatternChildren int
+	CollapsedLeafChildren    int
 	Children                 []Item
 }
 

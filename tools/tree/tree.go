@@ -32,7 +32,9 @@ type TreeOptions struct {
 	CollapseRepeated bool
 	// CollapsePattern collapses duplicate patterns, showing full structure only for first appearance
 	CollapsePattern bool
-	CollapsedDirs   []string
+	// CollapseLeaf collapses duplicate leaf items by adding to parent's CollapsedPatternChildren
+	CollapseLeaf  bool
+	CollapsedDirs []string
 }
 
 func Tree(dir string, opts TreeOptions) (string, error) {
@@ -47,6 +49,7 @@ func TreeCollapsed(dir string, opts TreeCollapseOptions) (string, error) {
 
 		CollapseRepeated: true,
 		CollapsePattern:  true,
+		CollapseLeaf:     true,
 		CollapsedDirs:    opts.CollapsedDirs,
 	})
 }
@@ -78,10 +81,11 @@ func traverseTreeItem(dir string, opts TreeOptions) (Item, error) {
 	sortItems(rootItem.Children)
 
 	// Apply collapsing if enabled using the modern Collapse function
-	if opts.CollapseRepeated || opts.CollapsePattern {
+	if opts.CollapseRepeated || opts.CollapsePattern || opts.CollapseLeaf {
 		rootItem = Collapse(rootItem, CollapseOptions{
 			CollapseRepeated: opts.CollapseRepeated,
 			CollapsePattern:  opts.CollapsePattern,
+			CollapseLeaf:     opts.CollapseLeaf,
 			CollapsedDirs:    opts.CollapsedDirs,
 		})
 	}
