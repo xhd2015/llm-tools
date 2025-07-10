@@ -5,6 +5,21 @@ import (
 	"strings"
 )
 
+func StringsToItem(list []string) Item {
+	if len(list) == 0 {
+		return Item{}
+	}
+	root := Item{
+		Name: list[0],
+	}
+
+	if len(list) > 1 {
+		child := StringsToItem(list[1:])
+		root.Children = append(root.Children, child)
+	}
+	return root
+}
+
 // PrintItems converts a slice of Items to a tree-like string representation
 func PrintItems(items []Item) string {
 	if len(items) == 0 {
@@ -29,7 +44,11 @@ func PrintItem(item Item) string {
 func addCollapsedInfo(name string, item Item) string {
 	totalCollapsed := item.CollapsedPatternChildren + item.CollapsedLeafChildren
 	if totalCollapsed > 0 {
-		name = fmt.Sprintf("%s (...%d collapsed)", name, totalCollapsed)
+		word := "collapsed"
+		if len(item.Children) > 0 {
+			word = "omitted"
+		}
+		name = fmt.Sprintf("%s (...%d %s)", name, totalCollapsed, word)
 	}
 	return name
 }
@@ -38,6 +57,10 @@ func addCollapsedInfo(name string, item Item) string {
 func printItem(item Item, prefix string, isLast bool, result *strings.Builder) {
 	// Build the item name with additional info
 	name := getName(item)
+
+	if item.Star {
+		name = "*" + name
+	}
 
 	// Add repetition indicator
 	if item.SubsequentRepeated > 0 {

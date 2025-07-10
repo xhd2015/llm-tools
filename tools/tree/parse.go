@@ -17,7 +17,9 @@ type Item struct {
 	// Number of children that were collapsed due to pattern matching (0 = no pattern collapse)
 	CollapsedPatternChildren int
 	CollapsedLeafChildren    int
-	Children                 []Item
+
+	Star     bool // show the *
+	Children []Item
 }
 
 func Parse(tree string) (Item, error) {
