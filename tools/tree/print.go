@@ -10,7 +10,8 @@ func StringsToItem(list []string) Item {
 		return Item{}
 	}
 	root := Item{
-		Name: list[0],
+		Name:         list[0],
+		MissingIndex: true,
 	}
 
 	if len(list) > 1 {
