@@ -5,7 +5,12 @@ import (
 	"os"
 	"strings"
 
-	"github.com/xhd2015/less-gen/flags"
+	"github.com/xhd2015/llm-tools/tools/batch_read_file"
+	"github.com/xhd2015/llm-tools/tools/get_workspace_root"
+	"github.com/xhd2015/llm-tools/tools/grep_search"
+	"github.com/xhd2015/llm-tools/tools/list_dir"
+	"github.com/xhd2015/llm-tools/tools/read_file"
+	"github.com/xhd2015/llm-tools/tools/run_terminal_cmd"
 	"github.com/xhd2015/llm-tools/tools/tree"
 )
 
@@ -46,34 +51,21 @@ func Handle(args []string) error {
 		return nil
 	}
 	switch cmd {
+	case "get_workspace_root":
+		return get_workspace_root.HandleCli(args)
 	case "batch_read_file":
-		return handle(args)
+		return batch_read_file.HandleCli(args)
 	case "read_file":
-		return handle(args)
+		return read_file.HandleCli(args)
 	case "tree":
 		return tree.HandleCli(args)
 	case "grep_search":
-		return handle(args)
+		return grep_search.HandleCli(args)
 	case "list_dir":
-		return handle(args)
+		return list_dir.HandleCli(args)
 	case "run_terminal_cmd":
-		return handle(args)
+		return run_terminal_cmd.HandleCli(args)
 	default:
 		return fmt.Errorf("unrecognized: %s", cmd)
 	}
-}
-
-func handle(args []string) error {
-	var verbose bool
-	var dir string
-	args, err := flags.String("--dir", &dir).
-		Bool("-v,--verbose", &verbose).
-		Help("-h,--help", help).
-		Parse(args)
-	if err != nil {
-		return err
-	}
-	_ = dir
-	_ = verbose
-	return nil
 }
