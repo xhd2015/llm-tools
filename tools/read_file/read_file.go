@@ -10,6 +10,7 @@ import (
 
 	"github.com/xhd2015/llm-tools/jsonschema"
 	"github.com/xhd2015/llm-tools/tools/defs"
+	"github.com/xhd2015/llm-tools/tools/dirs"
 )
 
 // ReadFileRequest represents the input parameters for the read_file tool
@@ -81,17 +82,9 @@ Reading the entire file is not allowed in most cases. You are only allowed to re
 
 // ReadFile executes the read_file tool with the given parameters
 func ReadFile(req ReadFileRequest) (*ReadFileResponse, error) {
-	// Validate input parameters
-	if req.TargetFile == "" {
-		return nil, fmt.Errorf("target_file is required")
-	}
-
-	filePath := req.TargetFile
-	if !filepath.IsAbs(filePath) {
-		if req.WorkspaceRoot == "" {
-			return nil, fmt.Errorf("workspace_root is required when target_file is a relative path")
-		}
-		filePath = filepath.Join(req.WorkspaceRoot, filePath)
+	filePath, err := dirs.GetPath(req.WorkspaceRoot, req.TargetFile, "target_file", false)
+	if err != nil {
+		return nil, err
 	}
 
 	// Check if file exists

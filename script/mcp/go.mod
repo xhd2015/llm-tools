@@ -4,7 +4,7 @@ go 1.24
 
 require (
 	github.com/mark3labs/mcp-go v0.32.0
-	github.com/xhd2015/less-gen v0.0.16
+	github.com/xhd2015/less-gen v0.0.17
 	github.com/xhd2015/llm-tools v0.0.1
 )
 

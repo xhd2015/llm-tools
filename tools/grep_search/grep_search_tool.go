@@ -2,6 +2,8 @@ package grep_search
 
 import (
 	"fmt"
+	"os"
+	"strings"
 
 	"github.com/xhd2015/less-gen/flags"
 )
@@ -28,11 +30,16 @@ func HandleCli(args []string) error {
 	var excludePattern string
 	var includePattern string
 	var explanation string
+	var dir string
+
+	var useGoGrep bool
 
 	args, err := flags.Bool("--case-sensitive", &caseSensitive).
 		String("--exclude", &excludePattern).
 		String("--include", &includePattern).
 		String("--explanation", &explanation).
+		String("--dir", &dir).
+		Bool("--use-go-grep", &useGoGrep).
 		Help("-h,--help", help).
 		Parse(args)
 	if err != nil {
@@ -44,22 +51,38 @@ func HandleCli(args []string) error {
 	}
 
 	if len(args) > 1 {
-		return fmt.Errorf("unrecognized extra arguments")
+		return fmt.Errorf("unrecognized extra arguments: %v", strings.Join(args[1:], ","))
 	}
 
 	query := args[0]
 
-	req := GrepSearchRequest{
-		Query:          query,
-		CaseSensitive:  caseSensitive,
-		ExcludePattern: excludePattern,
-		IncludePattern: includePattern,
-		Explanation:    explanation,
-	}
-
-	response, err := GrepSearch(req)
+	cwd, err := os.Getwd()
 	if err != nil {
 		return err
+	}
+
+	req := GrepSearchRequest{
+		WorkspaceRoot:        cwd,
+		RelativePathToSearch: dir,
+		Query:                query,
+		CaseSensitive:        caseSensitive,
+		ExcludePattern:       excludePattern,
+		IncludePattern:       includePattern,
+		Explanation:          explanation,
+	}
+
+	var response *GrepSearchResponse
+
+	if useGoGrep {
+		response, err = GoGrepSearch(req)
+		if err != nil {
+			return err
+		}
+	} else {
+		response, err = GrepSearch(req)
+		if err != nil {
+			return err
+		}
 	}
 
 	// Print results
