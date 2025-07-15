@@ -8,3 +8,5 @@
 *.exe
 
 /bin
+/llm-tools
+/llm-tools-mcp

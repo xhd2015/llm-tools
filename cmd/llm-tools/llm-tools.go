@@ -6,30 +6,51 @@ import (
 	"strings"
 
 	"github.com/xhd2015/llm-tools/tools/batch_read_file"
+	"github.com/xhd2015/llm-tools/tools/create_file"
+	"github.com/xhd2015/llm-tools/tools/edit_file"
 	"github.com/xhd2015/llm-tools/tools/get_workspace_root"
 	"github.com/xhd2015/llm-tools/tools/grep_search"
 	"github.com/xhd2015/llm-tools/tools/list_dir"
+	"github.com/xhd2015/llm-tools/tools/mcp_client"
 	"github.com/xhd2015/llm-tools/tools/read_file"
+	"github.com/xhd2015/llm-tools/tools/rename_file"
 	"github.com/xhd2015/llm-tools/tools/run_terminal_cmd"
+	"github.com/xhd2015/llm-tools/tools/search_replace"
+	"github.com/xhd2015/llm-tools/tools/send_answer"
 	"github.com/xhd2015/llm-tools/tools/tree"
 )
 
 const help = `
-llm-tools help to parse flags
+llm-tools - A collection of tools for LLM development
 
 Usage: llm-tools <cmd> [OPTIONS]
 
 Available commands:
-  create <name>                    create a new project
-  help                             show help message
+  get_workspace_root               get the workspace root directory
+  batch_read_file                  read multiple files in a single batch operation
+  read_file                        read the contents of a file
+  tree                             display directory tree structure
+  grep_search                      search for text patterns using regex
+  list_dir                         list the contents of a directory
+  run_terminal_cmd                 execute terminal commands
+  create_file                      create a new file with specified content
+  rename_file                      rename or move a file
+  edit_file                        edit a file by replacing all occurrences of a string
+  search_replace                   search and replace a single occurrence in a file
+  send_answer                      send a structured answer to another tool
+  mcp_client                       communicate with external MCP servers
+  help                             show this help message
 
 Options:
-  --dir <dir>                      set the output directory
-  -v,--verbose                     show verbose info  
+  -h, --help                       show help message for specific command
 
 Examples:
-  llm-tools help                         show help message
-  llm-tools create my_project            create a new project named my_project
+  llm-tools help                         show this help message
+  llm-tools read_file --help             show help for read_file command
+  llm-tools grep_search "pattern" .      search for pattern in current directory
+  llm-tools create_file new.txt          create a new file
+  llm-tools edit_file file.txt --old-string "old" --new-string "new"
+  llm-tools search_replace file.txt --old-string "unique_old" --new-string "new"
 `
 
 func main() {
@@ -42,7 +63,7 @@ func main() {
 
 func Handle(args []string) error {
 	if len(args) == 0 {
-		return fmt.Errorf("requires sub command: create")
+		return fmt.Errorf("requires sub command, use 'llm-tools help' to see available commands")
 	}
 	cmd := args[0]
 	args = args[1:]
@@ -65,6 +86,18 @@ func Handle(args []string) error {
 		return list_dir.HandleCli(args)
 	case "run_terminal_cmd":
 		return run_terminal_cmd.HandleCli(args)
+	case "create_file":
+		return create_file.HandleCli(args)
+	case "rename_file":
+		return rename_file.HandleCli(args)
+	case "edit_file":
+		return edit_file.HandleCli(args)
+	case "search_replace":
+		return search_replace.HandleCli(args)
+	case "send_answer":
+		return send_answer.HandleCli(args)
+	case "mcp_client":
+		return mcp_client.HandleCli(args)
 	default:
 		return fmt.Errorf("unrecognized: %s", cmd)
 	}

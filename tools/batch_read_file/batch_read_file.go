@@ -71,7 +71,7 @@ This tool is particularly useful when you need to read multiple related files (e
 			Properties: map[string]*jsonschema.JsonSchema{
 				"workspace_root": {
 					Type:        jsonschema.ParamTypeString,
-					Description: "The absolute path of the workspace root directory. This is used to resolve relative paths to files.",
+					Description: defs.WORKSPACE_ROOT,
 				},
 				"files": {
 					Type:        jsonschema.ParamTypeArray,
