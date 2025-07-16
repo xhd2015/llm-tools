@@ -7,7 +7,9 @@ import (
 
 	"github.com/xhd2015/llm-tools/tools/batch_read_file"
 	"github.com/xhd2015/llm-tools/tools/create_file"
+	"github.com/xhd2015/llm-tools/tools/delete_file"
 	"github.com/xhd2015/llm-tools/tools/edit_file"
+	"github.com/xhd2015/llm-tools/tools/file_search"
 	"github.com/xhd2015/llm-tools/tools/get_workspace_root"
 	"github.com/xhd2015/llm-tools/tools/grep_search"
 	"github.com/xhd2015/llm-tools/tools/list_dir"
@@ -17,7 +19,9 @@ import (
 	"github.com/xhd2015/llm-tools/tools/run_terminal_cmd"
 	"github.com/xhd2015/llm-tools/tools/search_replace"
 	"github.com/xhd2015/llm-tools/tools/send_answer"
+	"github.com/xhd2015/llm-tools/tools/todo_write"
 	"github.com/xhd2015/llm-tools/tools/tree"
+	"github.com/xhd2015/llm-tools/tools/web_search"
 )
 
 const help = `
@@ -39,6 +43,10 @@ Available commands:
   search_replace                   search and replace a single occurrence in a file
   send_answer                      send a structured answer to another tool
   mcp_client                       communicate with external MCP servers
+  file_search                      search for files by name pattern
+  delete_file                      delete a file safely
+  web_search                       search the web for real-time information
+  todo_write                       create and manage structured task lists
   help                             show this help message
 
 Options:
@@ -98,6 +106,14 @@ func Handle(args []string) error {
 		return send_answer.HandleCli(args)
 	case "mcp_client":
 		return mcp_client.HandleCli(args)
+	case "file_search":
+		return file_search.HandleCli(args)
+	case "delete_file":
+		return delete_file.HandleCli(args)
+	case "web_search":
+		return web_search.HandleCli(args)
+	case "todo_write":
+		return todo_write.HandleCli(args)
 	default:
 		return fmt.Errorf("unrecognized: %s", cmd)
 	}

@@ -19,9 +19,10 @@ import (
 
 // RunTerminalCmdRequest represents the input parameters for the run_terminal_cmd tool
 type RunTerminalCmdRequest struct {
-	Command      string `json:"command"`
-	IsBackground bool   `json:"is_background"`
-	Explanation  string `json:"explanation,omitempty"`
+	WorkspaceRoot string `json:"workspace_root"`
+	Command       string `json:"command"`
+	IsBackground  bool   `json:"is_background"`
+	Explanation   string `json:"explanation,omitempty"`
 }
 
 // RunTerminalCmdResponse represents the output of the run_terminal_cmd tool

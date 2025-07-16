@@ -16,7 +16,9 @@ import (
 	"github.com/xhd2015/llm-tools/tools/batch_read_file"
 	"github.com/xhd2015/llm-tools/tools/create_file"
 	"github.com/xhd2015/llm-tools/tools/defs"
+	"github.com/xhd2015/llm-tools/tools/delete_file"
 	"github.com/xhd2015/llm-tools/tools/edit_file"
+	"github.com/xhd2015/llm-tools/tools/file_search"
 	"github.com/xhd2015/llm-tools/tools/get_workspace_root"
 	"github.com/xhd2015/llm-tools/tools/grep_search"
 	"github.com/xhd2015/llm-tools/tools/list_dir"
@@ -26,6 +28,8 @@ import (
 	"github.com/xhd2015/llm-tools/tools/run_terminal_cmd"
 	"github.com/xhd2015/llm-tools/tools/search_replace"
 	"github.com/xhd2015/llm-tools/tools/send_answer"
+	"github.com/xhd2015/llm-tools/tools/todo_write"
+	"github.com/xhd2015/llm-tools/tools/web_search"
 )
 
 const help = `
@@ -108,6 +112,22 @@ var toolRegistry = map[string]ToolRegistry{
 	"mcp_client": {
 		GetDefinition:   mcp_client.GetToolDefinition,
 		ExecuteFromJSON: mcp_client.ExecuteFromJSON,
+	},
+	"file_search": {
+		GetDefinition:   file_search.GetToolDefinition,
+		ExecuteFromJSON: file_search.ExecuteFromJSON,
+	},
+	"delete_file": {
+		GetDefinition:   delete_file.GetToolDefinition,
+		ExecuteFromJSON: delete_file.ExecuteFromJSON,
+	},
+	"web_search": {
+		GetDefinition:   web_search.GetToolDefinition,
+		ExecuteFromJSON: web_search.ExecuteFromJSON,
+	},
+	"todo_write": {
+		GetDefinition:   todo_write.GetToolDefinition,
+		ExecuteFromJSON: todo_write.ExecuteFromJSON,
 	},
 }
 
