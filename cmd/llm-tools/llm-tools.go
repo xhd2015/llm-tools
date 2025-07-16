@@ -22,6 +22,7 @@ import (
 	"github.com/xhd2015/llm-tools/tools/todo_write"
 	"github.com/xhd2015/llm-tools/tools/tree"
 	"github.com/xhd2015/llm-tools/tools/web_search"
+	"github.com/xhd2015/llm-tools/tools/write_file"
 )
 
 const help = `
@@ -38,6 +39,7 @@ Available commands:
   list_dir                         list the contents of a directory
   run_terminal_cmd                 execute terminal commands
   create_file                      create a new file with specified content
+  write_file                       write content to a file with optional override protection
   rename_file                      rename or move a file
   edit_file                        edit a file by replacing all occurrences of a string
   search_replace                   search and replace a single occurrence in a file
@@ -57,6 +59,7 @@ Examples:
   llm-tools read_file --help             show help for read_file command
   llm-tools grep_search "pattern" .      search for pattern in current directory
   llm-tools create_file new.txt          create a new file
+  llm-tools write_file new.txt --content "content"  write content to a file
   llm-tools edit_file file.txt --old-string "old" --new-string "new"
   llm-tools search_replace file.txt --old-string "unique_old" --new-string "new"
 `
@@ -96,6 +99,8 @@ func Handle(args []string) error {
 		return run_terminal_cmd.HandleCli(args)
 	case "create_file":
 		return create_file.HandleCli(args)
+	case "write_file":
+		return write_file.HandleCli(args)
 	case "rename_file":
 		return rename_file.HandleCli(args)
 	case "edit_file":

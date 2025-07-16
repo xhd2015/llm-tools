@@ -30,6 +30,7 @@ import (
 	"github.com/xhd2015/llm-tools/tools/send_answer"
 	"github.com/xhd2015/llm-tools/tools/todo_write"
 	"github.com/xhd2015/llm-tools/tools/web_search"
+	"github.com/xhd2015/llm-tools/tools/write_file"
 )
 
 const help = `
@@ -72,6 +73,10 @@ var toolRegistry = map[string]ToolRegistry{
 	"batch_read_file": {
 		GetDefinition:   batch_read_file.GetToolDefinition,
 		ExecuteFromJSON: batch_read_file.ExecuteFromJSON,
+	},
+	"write_file": {
+		GetDefinition:   write_file.GetToolDefinition,
+		ExecuteFromJSON: write_file.ExecuteFromJSON,
 	},
 	"read_file": {
 		GetDefinition:   read_file.GetToolDefinition,
