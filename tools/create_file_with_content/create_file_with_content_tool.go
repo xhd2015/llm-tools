@@ -1,4 +1,4 @@
-package write_file
+package create_file_with_content
 
 import (
 	"fmt"
@@ -8,9 +8,9 @@ import (
 )
 
 const help = `
-llm-tools write_file writes content to a file with optional override protection
+llm-tools create_file_with_content creates a file with content
 
-Usage: llm-tools write_file <file> [OPTIONS]
+Usage: llm-tools create_file_with_content <file> [OPTIONS]
 
 Options:
   --workspace-root <path>      workspace root directory (defaults to current directory)
@@ -19,9 +19,9 @@ Options:
   --explanation <text>         explanation for the operation
 
 Examples:
-  llm-tools write_file newfile.txt --content "Hello, world!"
-  llm-tools write_file src/main.go --content "package main\n\nfunc main() {}" --workspace-root /path/to/workspace
-  llm-tools write_file existing.txt --content "New content" --dangerous-override
+  llm-tools create_file_with_content newfile.txt --content "Hello, world!"
+  llm-tools create_file_with_content src/main.go --content "package main\n\nfunc main() {}" --workspace-root /path/to/workspace
+  llm-tools create_file_with_content existing.txt --content "New content" --dangerous-override
 `
 
 func HandleCli(args []string) error {
@@ -62,15 +62,15 @@ func HandleCli(args []string) error {
 		}
 	}
 
-	req := WriteFileRequest{
+	req := CreateFileWithContentRequest{
 		WorkspaceRoot:     workspaceRoot,
 		TargetFile:        targetFile,
-		Content:           content,
+		NonEmptyContent:   content,
 		DangerousOverride: dangerousOverride,
 		Explanation:       explanation,
 	}
 
-	response, err := WriteFile(req)
+	response, err := CreateFileWithContent(req)
 	if err != nil {
 		return err
 	}

@@ -15,6 +15,7 @@ import (
 	"github.com/xhd2015/less-gen/flags"
 	"github.com/xhd2015/llm-tools/tools/batch_read_file"
 	"github.com/xhd2015/llm-tools/tools/create_file"
+	"github.com/xhd2015/llm-tools/tools/create_file_with_content"
 	"github.com/xhd2015/llm-tools/tools/defs"
 	"github.com/xhd2015/llm-tools/tools/delete_file"
 	"github.com/xhd2015/llm-tools/tools/edit_file"
@@ -30,7 +31,7 @@ import (
 	"github.com/xhd2015/llm-tools/tools/send_answer"
 	"github.com/xhd2015/llm-tools/tools/todo_write"
 	"github.com/xhd2015/llm-tools/tools/web_search"
-	"github.com/xhd2015/llm-tools/tools/write_file"
+	"github.com/xhd2015/llm-tools/tools/whats_next"
 )
 
 const help = `
@@ -74,9 +75,9 @@ var toolRegistry = map[string]ToolRegistry{
 		GetDefinition:   batch_read_file.GetToolDefinition,
 		ExecuteFromJSON: batch_read_file.ExecuteFromJSON,
 	},
-	"write_file": {
-		GetDefinition:   write_file.GetToolDefinition,
-		ExecuteFromJSON: write_file.ExecuteFromJSON,
+	"create_file_with_content": {
+		GetDefinition:   create_file_with_content.GetToolDefinition,
+		ExecuteFromJSON: create_file_with_content.ExecuteFromJSON,
 	},
 	"read_file": {
 		GetDefinition:   read_file.GetToolDefinition,
@@ -133,6 +134,10 @@ var toolRegistry = map[string]ToolRegistry{
 	"todo_write": {
 		GetDefinition:   todo_write.GetToolDefinition,
 		ExecuteFromJSON: todo_write.ExecuteFromJSON,
+	},
+	"whats_next": {
+		GetDefinition:   whats_next.GetToolDefinition,
+		ExecuteFromJSON: whats_next.ExecuteFromJSON,
 	},
 }
 

@@ -1,4 +1,4 @@
-package write_file
+package create_file_with_content
 
 import (
 	"encoding/json"
@@ -11,27 +11,27 @@ import (
 	"github.com/xhd2015/llm-tools/tools/dirs"
 )
 
-// WriteFileRequest represents the input parameters for the write_file tool
-type WriteFileRequest struct {
+// CreateFileWithContentRequest represents the input parameters for the create_file_with_content tool
+type CreateFileWithContentRequest struct {
 	WorkspaceRoot     string `json:"workspace_root"`
 	TargetFile        string `json:"target_file"`
-	Content           string `json:"content"`
+	NonEmptyContent   string `json:"non_empty_content"`
 	DangerousOverride bool   `json:"dangerous_override"`
 	Explanation       string `json:"explanation"`
 }
 
-// WriteFileResponse represents the output of the write_file tool
-type WriteFileResponse struct {
+// CreateFileWithContentResponse represents the output of the create_file_with_content tool
+type CreateFileWithContentResponse struct {
 	Success      bool `json:"success"`
 	BytesWritten int  `json:"bytes_written"`
 	Overwritten  bool `json:"overwritten"`
 }
 
-// GetToolDefinition returns the JSON schema definition for the write_file tool
+// GetToolDefinition returns the JSON schema definition for the create_file_with_content tool
 func GetToolDefinition() defs.ToolDefinition {
 	return defs.ToolDefinition{
-		Description: `Write content to a file. By default, this tool will fail if the file already exists to prevent accidental overwrites. Use the dangerous_override flag to allow overwriting existing files. The tool will create any necessary parent directories if they don't exist.`,
-		Name:        "write_file",
+		Description: `Create a file with content. By default, this tool will fail if the file already exists to prevent accidental overwrites. Use the dangerous_override flag to allow overwriting existing files. The tool will create any necessary parent directories if they don't exist.`,
+		Name:        "create_file_with_content",
 		Parameters: &jsonschema.JsonSchema{
 			Type: jsonschema.ParamTypeObject,
 			Properties: map[string]*jsonschema.JsonSchema{
@@ -41,11 +41,11 @@ func GetToolDefinition() defs.ToolDefinition {
 				},
 				"target_file": {
 					Type:        jsonschema.ParamTypeString,
-					Description: "The path of the file to write. You can use either a relative path in the workspace or an absolute path. If an absolute path is provided, it will be preserved as is.",
+					Description: "The path of the file to create. You can use either a relative path in the workspace or an absolute path. If an absolute path is provided, it will be preserved as is.",
 				},
-				"content": {
+				"non_empty_content": {
 					Type:        jsonschema.ParamTypeString,
-					Description: "The content to write to the file.",
+					Description: "The content to write to the file. Must be non-empty.",
 				},
 				"dangerous_override": {
 					Type:        jsonschema.ParamTypeBoolean,
@@ -56,13 +56,17 @@ func GetToolDefinition() defs.ToolDefinition {
 					Description: defs.EXPLANATION,
 				},
 			},
-			Required: []string{"target_file", "content"},
+			Required: []string{"target_file", "non_empty_content"},
 		},
 	}
 }
 
-// WriteFile executes the write_file tool with the given parameters
-func WriteFile(req WriteFileRequest) (*WriteFileResponse, error) {
+// CreateFileWithContent executes the create_file_with_content tool with the given parameters
+func CreateFileWithContent(req CreateFileWithContentRequest) (*CreateFileWithContentResponse, error) {
+	if req.NonEmptyContent == "" {
+		return nil, fmt.Errorf("requires non-empty content")
+	}
+
 	filePath, err := dirs.GetPath(req.WorkspaceRoot, req.TargetFile, "target_file", true)
 	if err != nil {
 		return nil, err
@@ -87,34 +91,34 @@ func WriteFile(req WriteFileRequest) (*WriteFileResponse, error) {
 	}
 
 	// Write content to file
-	err = os.WriteFile(filePath, []byte(req.Content), 0644)
+	err = os.WriteFile(filePath, []byte(req.NonEmptyContent), 0644)
 	if err != nil {
 		return nil, fmt.Errorf("failed to write file: %w", err)
 	}
 
-	return &WriteFileResponse{
+	return &CreateFileWithContentResponse{
 		Success:      true,
-		BytesWritten: len(req.Content),
+		BytesWritten: len(req.NonEmptyContent),
 		Overwritten:  overwritten,
 	}, nil
 }
 
-func ParseJSONRequest(jsonInput string) (WriteFileRequest, error) {
-	var req WriteFileRequest
+func ParseJSONRequest(jsonInput string) (CreateFileWithContentRequest, error) {
+	var req CreateFileWithContentRequest
 	if err := json.Unmarshal([]byte(jsonInput), &req); err != nil {
-		return WriteFileRequest{}, fmt.Errorf("failed to parse JSON input: %w", err)
+		return CreateFileWithContentRequest{}, fmt.Errorf("failed to parse JSON input: %w", err)
 	}
 	return req, nil
 }
 
-// ExecuteFromJSON executes the write_file tool from JSON input
+// ExecuteFromJSON executes the create_file_with_content tool from JSON input
 func ExecuteFromJSON(jsonInput string) (string, error) {
-	var req WriteFileRequest
+	var req CreateFileWithContentRequest
 	if err := json.Unmarshal([]byte(jsonInput), &req); err != nil {
 		return "", fmt.Errorf("failed to parse JSON input: %w", err)
 	}
 
-	response, err := WriteFile(req)
+	response, err := CreateFileWithContent(req)
 	if err != nil {
 		return "", err
 	}

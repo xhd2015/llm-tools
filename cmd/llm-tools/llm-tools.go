@@ -7,6 +7,7 @@ import (
 
 	"github.com/xhd2015/llm-tools/tools/batch_read_file"
 	"github.com/xhd2015/llm-tools/tools/create_file"
+	"github.com/xhd2015/llm-tools/tools/create_file_with_content"
 	"github.com/xhd2015/llm-tools/tools/delete_file"
 	"github.com/xhd2015/llm-tools/tools/edit_file"
 	"github.com/xhd2015/llm-tools/tools/file_search"
@@ -22,7 +23,7 @@ import (
 	"github.com/xhd2015/llm-tools/tools/todo_write"
 	"github.com/xhd2015/llm-tools/tools/tree"
 	"github.com/xhd2015/llm-tools/tools/web_search"
-	"github.com/xhd2015/llm-tools/tools/write_file"
+	"github.com/xhd2015/llm-tools/tools/whats_next"
 )
 
 const help = `
@@ -38,8 +39,8 @@ Available commands:
   grep_search                      search for text patterns using regex
   list_dir                         list the contents of a directory
   run_terminal_cmd                 execute terminal commands
-  create_file                      create a new file with specified content
-  write_file                       write content to a file with optional override protection
+  create_file                      create a new empty file with optional directory creation
+  create_file_with_content         create a file with content and optional override protection
   rename_file                      rename or move a file
   edit_file                        edit a file by replacing all occurrences of a string
   search_replace                   search and replace a single occurrence in a file
@@ -49,6 +50,7 @@ Available commands:
   delete_file                      delete a file safely
   web_search                       search the web for real-time information
   todo_write                       create and manage structured task lists
+  whats_next                       run interactive CLI and wait for user follow-up questions
   help                             show this help message
 
 Options:
@@ -58,10 +60,12 @@ Examples:
   llm-tools help                         show this help message
   llm-tools read_file --help             show help for read_file command
   llm-tools grep_search "pattern" .      search for pattern in current directory
-  llm-tools create_file new.txt          create a new file
-  llm-tools write_file new.txt --content "content"  write content to a file
+  llm-tools create_file new.txt          create a new empty file
+  llm-tools create_file deep/path/file.txt --mkdirs  create file with parent directories
+  llm-tools create_file_with_content new.txt --content "content"  create file with content
   llm-tools edit_file file.txt --old-string "old" --new-string "new"
   llm-tools search_replace file.txt --old-string "unique_old" --new-string "new"
+  llm-tools whats_next                   run interactive CLI for follow-up questions
 `
 
 func main() {
@@ -99,8 +103,8 @@ func Handle(args []string) error {
 		return run_terminal_cmd.HandleCli(args)
 	case "create_file":
 		return create_file.HandleCli(args)
-	case "write_file":
-		return write_file.HandleCli(args)
+	case "create_file_with_content":
+		return create_file_with_content.HandleCli(args)
 	case "rename_file":
 		return rename_file.HandleCli(args)
 	case "edit_file":
@@ -119,6 +123,8 @@ func Handle(args []string) error {
 		return web_search.HandleCli(args)
 	case "todo_write":
 		return todo_write.HandleCli(args)
+	case "whats_next":
+		return whats_next.HandleCli(args)
 	default:
 		return fmt.Errorf("unrecognized: %s", cmd)
 	}

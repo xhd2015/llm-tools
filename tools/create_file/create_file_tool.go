@@ -8,27 +8,28 @@ import (
 )
 
 const help = `
-llm-tools create_file creates a new file with the specified content
+llm-tools create_file creates a new empty file
 
 Usage: llm-tools create_file <file> [OPTIONS]
 
 Options:
   --workspace-root <path>      workspace root directory (defaults to current directory)
-  --content <text>             content to write to the file (required)
+  --mkdirs                     create parent directories if they don't exist (default: false)
   --explanation <text>         explanation for the operation
 
 Examples:
-  llm-tools create_file newfile.txt --content "Hello, world!"
-  llm-tools create_file src/main.go --content "package main\n\nfunc main() {}" --workspace-root /path/to/workspace
+  llm-tools create_file newfile.txt
+  llm-tools create_file src/main.go --workspace-root /path/to/workspace
+  llm-tools create_file deep/path/file.txt --mkdirs
 `
 
 func HandleCli(args []string) error {
 	var workspaceRoot string
-	var content string
+	var mkdirs bool
 	var explanation string
 
 	args, err := flags.String("--workspace-root", &workspaceRoot).
-		String("--content", &content).
+		Bool("--mkdirs", &mkdirs).
 		String("--explanation", &explanation).
 		Help("-h,--help", help).
 		Parse(args)
@@ -37,18 +38,14 @@ func HandleCli(args []string) error {
 	}
 
 	if len(args) == 0 {
-		return fmt.Errorf("target file is required")
+		return fmt.Errorf("file path is required")
 	}
 
 	if len(args) > 1 {
 		return fmt.Errorf("unrecognized extra arguments")
 	}
 
-	if content == "" {
-		return fmt.Errorf("--content is required")
-	}
-
-	targetFile := args[0]
+	filePath := args[0]
 
 	// Use current working directory if workspace_root is not provided
 	if workspaceRoot == "" {
@@ -60,8 +57,8 @@ func HandleCli(args []string) error {
 
 	req := CreateFileRequest{
 		WorkspaceRoot: workspaceRoot,
-		TargetFile:    targetFile,
-		Content:       content,
+		FilePath:      filePath,
+		Mkdirs:        mkdirs,
 		Explanation:   explanation,
 	}
 
@@ -74,7 +71,7 @@ func HandleCli(args []string) error {
 	fmt.Printf("Success: %v\n", response.Success)
 	fmt.Printf("Message: %s\n", response.Message)
 	fmt.Printf("File Path: %s\n", response.FilePath)
-	fmt.Printf("Bytes Written: %d\n", response.BytesWritten)
+	fmt.Printf("Dirs Created: %v\n", response.DirsCreated)
 
 	return nil
 }
