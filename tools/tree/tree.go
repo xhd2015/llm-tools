@@ -35,6 +35,12 @@ type TreeOptions struct {
 	// CollapseLeaf collapses duplicate leaf items by adding to parent's CollapsedPatternChildren
 	CollapseLeaf  bool
 	CollapsedDirs []string
+	// Depth is the maximum depth of the directory tree to traverse (default 8)
+	Depth int
+	// MaxEntriesPerDir is the maximum number of entries to display in each directory (default 48)
+	MaxEntriesPerDir int
+	// ExpandDirs are directories that should be expanded with additional depth
+	ExpandDirs []string
 }
 
 func Tree(dir string, opts TreeOptions) (string, error) {
@@ -43,14 +49,16 @@ func Tree(dir string, opts TreeOptions) (string, error) {
 
 func TreeCollapsed(dir string, opts TreeCollapseOptions) (string, error) {
 	return traverseTree(dir, TreeOptions{
-		IncludePatterns: opts.IncludePatterns,
-		ExcludePatterns: opts.ExcludePatterns,
-		DirectoriesOnly: opts.DirectoriesOnly,
-
+		IncludePatterns:  opts.IncludePatterns,
+		ExcludePatterns:  opts.ExcludePatterns,
+		DirectoriesOnly:  opts.DirectoriesOnly,
 		CollapseRepeated: true,
 		CollapsePattern:  true,
 		CollapseLeaf:     true,
 		CollapsedDirs:    opts.CollapsedDirs,
+		Depth:            DEFAULT_MAX_DEPTH,
+		MaxEntriesPerDir: DEFAULT_MAX_ENTRIES_PER_DIR,
+		ExpandDirs:       opts.CollapsedDirs,
 	})
 }
 
@@ -88,6 +96,11 @@ func traverseTreeItem(dir string, opts TreeOptions) (Item, error) {
 			CollapseLeaf:     opts.CollapseLeaf,
 			CollapsedDirs:    opts.CollapsedDirs,
 		})
+	}
+
+	// Apply max entries limit after collapse recursively
+	if opts.MaxEntriesPerDir > 0 {
+		applyMaxEntriesLimit(&rootItem, opts.MaxEntriesPerDir)
 	}
 
 	// Convert to string representation using modern PrintItem
@@ -135,6 +148,17 @@ func cloneList(list []string) []string {
 	clone := make([]string, len(list))
 	copy(clone, list)
 	return clone
+}
+
+// applyMaxEntriesLimit recursively applies the max entries limit to all items
+func applyMaxEntriesLimit(item *Item, maxEntries int) {
+	if len(item.Children) > maxEntries {
+		item.Children = item.Children[:maxEntries]
+	}
+
+	for i := range item.Children {
+		applyMaxEntriesLimit(&item.Children[i], maxEntries)
+	}
 }
 
 func sortItems(items []Item) {
@@ -185,11 +209,19 @@ func buildTreeAsItem(dir string, opts TreeOptions) (Item, error) {
 		}
 	}
 
-	return buildTreeAsItemRecursive(dir, opts, includePatterns, excludePatterns)
+	// Set default values if not specified
+	if opts.Depth == 0 {
+		opts.Depth = DEFAULT_MAX_DEPTH
+	}
+	if opts.MaxEntriesPerDir == 0 {
+		opts.MaxEntriesPerDir = DEFAULT_MAX_ENTRIES_PER_DIR
+	}
+
+	return buildTreeAsItemRecursive(dir, opts, includePatterns, excludePatterns, 0)
 }
 
 // buildTreeAsItemRecursive recursively builds tree structure as Items
-func buildTreeAsItemRecursive(dir string, opts TreeOptions, includePatterns []*regexp.Regexp, excludePatterns []*regexp.Regexp) (Item, error) {
+func buildTreeAsItemRecursive(dir string, opts TreeOptions, includePatterns []*regexp.Regexp, excludePatterns []*regexp.Regexp, currentDepth int) (Item, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return Item{}, err
@@ -198,7 +230,7 @@ func buildTreeAsItemRecursive(dir string, opts TreeOptions, includePatterns []*r
 	// Filter entries based on options
 	var filteredEntries []os.DirEntry
 	for _, entry := range entries {
-		// Skip files if DirectoriesOnly is true
+		// Handle file filtering - use DirectoriesOnly if set, otherwise use IncludeFiles
 		if opts.DirectoriesOnly && !entry.IsDir() {
 			continue
 		}
@@ -270,12 +302,38 @@ func buildTreeAsItemRecursive(dir string, opts TreeOptions, includePatterns []*r
 		// If it's a directory, recursively process it
 		if isDir {
 			subDir := filepath.Join(dir, entryName)
-			subItem, err := buildTreeAsItemRecursive(subDir, opts, includePatterns, excludePatterns)
-			if err != nil {
-				return Item{}, err
+
+			// Check depth limit (but allow expansion for directories in ExpandDirs)
+			shouldExpand := false
+			if opts.Depth > 0 {
+				// Check if this directory should be expanded
+				for _, expandDir := range opts.ExpandDirs {
+					if strings.Contains(subDir, expandDir) || strings.Contains(expandDir, subDir) {
+						shouldExpand = true
+						break
+					}
+				}
+
+				if currentDepth+1 >= opts.Depth && !shouldExpand {
+					// Don't recurse further, but mark as directory
+					child.Dir = true
+				} else {
+					subItem, err := buildTreeAsItemRecursive(subDir, opts, includePatterns, excludePatterns, currentDepth+1)
+					if err != nil {
+						return Item{}, err
+					}
+					// Use the children from the recursive call
+					child.Children = subItem.Children
+				}
+			} else {
+				// No depth limit, always recurse
+				subItem, err := buildTreeAsItemRecursive(subDir, opts, includePatterns, excludePatterns, currentDepth+1)
+				if err != nil {
+					return Item{}, err
+				}
+				// Use the children from the recursive call
+				child.Children = subItem.Children
 			}
-			// Use the children from the recursive call
-			child.Children = subItem.Children
 		}
 
 		children = append(children, child)

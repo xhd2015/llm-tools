@@ -30,6 +30,7 @@ import (
 	"github.com/xhd2015/llm-tools/tools/search_replace"
 	"github.com/xhd2015/llm-tools/tools/send_answer"
 	"github.com/xhd2015/llm-tools/tools/todo_write"
+	"github.com/xhd2015/llm-tools/tools/tree"
 	"github.com/xhd2015/llm-tools/tools/web_search"
 	"github.com/xhd2015/llm-tools/tools/whats_next"
 )
@@ -134,6 +135,10 @@ var toolRegistry = map[string]ToolRegistry{
 	"todo_write": {
 		GetDefinition:   todo_write.GetToolDefinition,
 		ExecuteFromJSON: todo_write.ExecuteFromJSON,
+	},
+	"tree": {
+		GetDefinition:   tree.GetToolDefinition,
+		ExecuteFromJSON: tree.ExecuteFromJSON,
 	},
 	"whats_next": {
 		GetDefinition:   whats_next.GetToolDefinition,

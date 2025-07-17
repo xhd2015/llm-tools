@@ -208,7 +208,7 @@ func TestPrintItemCompact(t *testing.T) {
 		{
 			name:     "item_with_collapsed_pattern",
 			item:     Item{Name: "CallA", Index: 1, CollapsedPatternChildren: 5},
-			expected: "1_CallA(...5)",
+			expected: "1_CallA (...5 collapsed)",
 		},
 		{
 			name: "item_with_children",

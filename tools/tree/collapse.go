@@ -4,6 +4,7 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"fmt"
+	"sort"
 )
 
 // collapse try to minimize the output size
@@ -183,50 +184,98 @@ func collapseRepeatedItems(items []internalItem) []internalItem {
 		}
 	}
 
-	// Choose the best pattern to collapse
-	// Prefer patterns with higher repeat counts, then longer patterns, then later starting position
-	var bestPattern *pattern
-	for i := range patterns {
-		p := &patterns[i]
-		if bestPattern == nil {
-			bestPattern = p
-		} else {
-			// Prefer patterns with higher repeat counts first
-			if p.repeatCount > bestPattern.repeatCount {
-				bestPattern = p
-			} else if p.repeatCount == bestPattern.repeatCount {
-				// If same repeat count, prefer longer patterns
-				if p.length > bestPattern.length {
-					bestPattern = p
-				} else if p.length == bestPattern.length {
-					// If same length, prefer later starting position
-					if p.start > bestPattern.start {
-						bestPattern = p
+	// Find the best pattern(s) to collapse
+	// Sort patterns by priority: higher repeat counts first, then longer patterns, then later starting position
+	sort.Slice(patterns, func(i, j int) bool {
+		if patterns[i].repeatCount != patterns[j].repeatCount {
+			return patterns[i].repeatCount > patterns[j].repeatCount
+		}
+		if patterns[i].length != patterns[j].length {
+			return patterns[i].length > patterns[j].length
+		}
+		return patterns[i].start > patterns[j].start
+	})
+
+	// Select the best pattern, and other patterns only if they have the same priority
+	var selectedPatterns []pattern
+	if len(patterns) > 0 {
+		bestPattern := patterns[0]
+		selectedPatterns = append(selectedPatterns, bestPattern)
+
+		// Mark positions used by the best pattern
+		used := make([]bool, n)
+		for pos := bestPattern.start; pos < bestPattern.start+bestPattern.totalLength; pos++ {
+			used[pos] = true
+		}
+
+		// Add other patterns if they don't overlap and meet certain criteria
+		for i := 1; i < len(patterns); i++ {
+			p := patterns[i]
+
+			// Check if this pattern overlaps with any selected pattern
+			overlaps := false
+			for pos := p.start; pos < p.start+p.totalLength; pos++ {
+				if used[pos] {
+					overlaps = true
+					break
+				}
+			}
+
+			if !overlaps {
+				// Allow patterns with significantly different content structure
+				allowPattern := false
+
+				// Check if this pattern has a significantly different structure
+				// (e.g., different number of children in the pattern elements)
+				if bestPattern.length > 0 && p.length > 0 {
+					bestPatternFirstElement := items[bestPattern.start]
+					currentPatternFirstElement := items[p.start]
+
+					// Consider patterns with different child counts as significantly different
+					if len(bestPatternFirstElement.children) != len(currentPatternFirstElement.children) {
+						allowPattern = true
+					}
+				}
+
+				if allowPattern {
+					selectedPatterns = append(selectedPatterns, p)
+					// Mark positions as used
+					for pos := p.start; pos < p.start+p.totalLength; pos++ {
+						used[pos] = true
 					}
 				}
 			}
 		}
 	}
 
-	if bestPattern != nil {
-		// Build result with the selected pattern collapsed
+	if len(selectedPatterns) > 0 {
+		// Build result with all selected patterns collapsed
 		result := make([]internalItem, 0, n)
 
-		// Add items before the pattern
-		for i := 0; i < bestPattern.start; i++ {
-			result = append(result, items[i])
+		// Sort selected patterns by start position to process them in order
+		sort.Slice(selectedPatterns, func(i, j int) bool {
+			return selectedPatterns[i].start < selectedPatterns[j].start
+		})
+
+		pos := 0
+		for _, p := range selectedPatterns {
+			// Add items before the pattern
+			for i := pos; i < p.start; i++ {
+				result = append(result, items[i])
+			}
+
+			// Add the pattern items with repeat counts
+			for j := 0; j < p.length; j++ {
+				item := items[p.start+j]
+				item.item.SubsequentRepeated = p.repeatCount - 1
+				result = append(result, item)
+			}
+
+			pos = p.start + p.totalLength
 		}
 
-		// Add the pattern items with repeat counts
-		for j := 0; j < bestPattern.length; j++ {
-			item := items[bestPattern.start+j]
-			item.item.SubsequentRepeated = bestPattern.repeatCount - 1
-			result = append(result, item)
-		}
-
-		// Add items after the pattern
-		afterPatternStart := bestPattern.start + bestPattern.totalLength
-		for i := afterPatternStart; i < n; i++ {
+		// Add remaining items after the last pattern
+		for i := pos; i < n; i++ {
 			result = append(result, items[i])
 		}
 
@@ -376,20 +425,9 @@ func collapseLeafItems(items []internalItem) []internalItem {
 				}
 			}
 			if !shouldKeep {
-				// find previous matching item
-				var found bool
-				n := len(finalItems)
-				for i := n - 1; i >= 0; i-- {
-					finalItem := &finalItems[i]
-					if finalItem.item.Name == itemName {
-						finalItem.item.SubsequentRepeated++
-						found = true
-						break
-					}
-				}
-				if !found {
-					collapsedLeafCount++
-				}
+				// For CollapseLeaf, we always just count collapsed leaves
+				// SubsequentRepeated should only be set by CollapseRepeated for consecutive items
+				collapsedLeafCount++
 			} else {
 				finalItems = append(finalItems, item)
 			}

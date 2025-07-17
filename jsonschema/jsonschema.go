@@ -16,6 +16,7 @@ type JsonSchema struct {
 	Description string                 `json:"description,omitempty"`
 	Items       *JsonSchema            `json:"items,omitempty"`
 	Required    []string               `json:"required,omitempty"`
+	Default     interface{}            `json:"default,omitempty"`
 }
 
 func (c *JsonSchema) ToMap() map[string]any {

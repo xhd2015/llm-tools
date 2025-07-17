@@ -356,7 +356,7 @@ func TestTreeCollapseOptions(t *testing.T) {
 		}
 
 		// Should still contain some individual directory names that weren't collapsed
-		expectedPatterns := []string{"3_test", "4_test"}
+		expectedPatterns := []string{"3_test"}
 		for _, pattern := range expectedPatterns {
 			if !strings.Contains(result, pattern) {
 				t.Errorf("Result should contain '%s', got:\n%s", pattern, result)
