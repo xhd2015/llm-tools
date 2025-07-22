@@ -65,7 +65,7 @@ func HandleCli(args []string) error {
 	req := CreateFileWithContentRequest{
 		WorkspaceRoot:     workspaceRoot,
 		TargetFile:        targetFile,
-		NonEmptyContent:   content,
+		Content:           content,
 		DangerousOverride: dangerousOverride,
 		Explanation:       explanation,
 	}

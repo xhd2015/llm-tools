@@ -15,7 +15,7 @@ import (
 type CreateFileWithContentRequest struct {
 	WorkspaceRoot     string `json:"workspace_root"`
 	TargetFile        string `json:"target_file"`
-	NonEmptyContent   string `json:"non_empty_content"`
+	Content           string `json:"content"`
 	DangerousOverride bool   `json:"dangerous_override"`
 	Explanation       string `json:"explanation"`
 }
@@ -43,9 +43,9 @@ func GetToolDefinition() defs.ToolDefinition {
 					Type:        jsonschema.ParamTypeString,
 					Description: "The path of the file to create. You can use either a relative path in the workspace or an absolute path. If an absolute path is provided, it will be preserved as is.",
 				},
-				"non_empty_content": {
+				"content": {
 					Type:        jsonschema.ParamTypeString,
-					Description: "The content to write to the file. Must be non-empty.",
+					Description: "The content to write to the file.",
 				},
 				"dangerous_override": {
 					Type:        jsonschema.ParamTypeBoolean,
@@ -56,17 +56,13 @@ func GetToolDefinition() defs.ToolDefinition {
 					Description: defs.EXPLANATION,
 				},
 			},
-			Required: []string{"target_file", "non_empty_content"},
+			Required: []string{"target_file", "content"},
 		},
 	}
 }
 
 // CreateFileWithContent executes the create_file_with_content tool with the given parameters
 func CreateFileWithContent(req CreateFileWithContentRequest) (*CreateFileWithContentResponse, error) {
-	if req.NonEmptyContent == "" {
-		return nil, fmt.Errorf("requires non-empty content")
-	}
-
 	filePath, err := dirs.GetPath(req.WorkspaceRoot, req.TargetFile, "target_file", true)
 	if err != nil {
 		return nil, err
@@ -91,14 +87,14 @@ func CreateFileWithContent(req CreateFileWithContentRequest) (*CreateFileWithCon
 	}
 
 	// Write content to file
-	err = os.WriteFile(filePath, []byte(req.NonEmptyContent), 0644)
+	err = os.WriteFile(filePath, []byte(req.Content), 0644)
 	if err != nil {
 		return nil, fmt.Errorf("failed to write file: %w", err)
 	}
 
 	return &CreateFileWithContentResponse{
 		Success:      true,
-		BytesWritten: len(req.NonEmptyContent),
+		BytesWritten: len(req.Content),
 		Overwritten:  overwritten,
 	}, nil
 }
