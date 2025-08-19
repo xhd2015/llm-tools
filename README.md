@@ -48,3 +48,10 @@ https://gist.github.com/sshh12/25ad2e40529b269a88b80e7cf1c38084
 https://blog.sshh.io/p/how-cursor-ai-ide-works
 
 https://gist.github.com/ichim-david/bf24513616aa7dc5c74abcae35ddf706
+
+# Some interesting prompt to the tool
+Cursor: (by asking in the chat)
+
+```
+You have both the edit_file and search_replace tools at your disposal. Use the search_replace tool for files larger than 2500 lines, otherwise prefer the edit_file tool.
+```

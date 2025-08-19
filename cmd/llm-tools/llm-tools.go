@@ -24,6 +24,7 @@ import (
 	"github.com/xhd2015/llm-tools/tools/tree"
 	"github.com/xhd2015/llm-tools/tools/web_search"
 	"github.com/xhd2015/llm-tools/tools/whats_next"
+	"github.com/xhd2015/llm-tools/tools/write_file"
 )
 
 const help = `
@@ -41,6 +42,7 @@ Available commands:
   run_terminal_cmd                 execute terminal commands
   create_file                      create a new empty file with optional directory creation
   create_file_with_content         create a file with content and optional override protection
+  write_file                       create a file with content
   rename_file                      rename or move a file
   edit_file                        edit a file by replacing all occurrences of a string
   search_replace                   search and replace a single occurrence in a file
@@ -105,6 +107,8 @@ func Handle(args []string) error {
 		return create_file.HandleCli(args)
 	case "create_file_with_content":
 		return create_file_with_content.HandleCli(args)
+	case "write_file":
+		return write_file.HandleCli(args)
 	case "rename_file":
 		return rename_file.HandleCli(args)
 	case "edit_file":
