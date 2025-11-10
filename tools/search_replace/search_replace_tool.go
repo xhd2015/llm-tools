@@ -2,6 +2,7 @@ package search_replace
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/xhd2015/less-gen/flags"
 )
@@ -28,8 +29,8 @@ func HandleCli(args []string) error {
 
 	args, err := flags.
 		String("--workspace-root", &workspaceRoot).
-		String("--old-string", &oldString).
-		String("--new-string", &newString).
+		String("--old", &oldString).
+		String("--new", &newString).
 		Help("-h,--help", help).
 		Parse(args)
 	if err != nil {
@@ -37,41 +38,36 @@ func HandleCli(args []string) error {
 	}
 
 	if len(args) == 0 {
-		return fmt.Errorf("target file is required")
+		return fmt.Errorf("requires file")
 	}
 
-	if len(args) > 1 {
-		return fmt.Errorf("unrecognized extra arguments")
+	file := args[0]
+	args = args[1:]
+	if len(args) > 0 {
+		return fmt.Errorf("unrecognized extra args: %s", strings.Join(args, " "))
 	}
 
 	if oldString == "" {
-		return fmt.Errorf("--old-string is required")
+		return fmt.Errorf("--old is required")
 	}
 
 	if newString == "" {
-		return fmt.Errorf("--new-string is required")
+		return fmt.Errorf("--new is required")
 	}
-
-	targetFile := args[0]
 
 	req := SearchReplaceRequest{
-		WorkspaceRoot: workspaceRoot,
-		FilePath:      targetFile,
-		OldString:     oldString,
-		NewString:     newString,
+		File: file,
+		Old:  oldString,
+		New:  newString,
 	}
 
-	response, err := SearchReplace(req)
+	response, err := SearchReplace(req, workspaceRoot)
 	if err != nil {
 		return err
 	}
 
 	// Print results
-	fmt.Printf("Success: %v\n", response.Success)
-	fmt.Printf("Message: %s\n", response.Message)
-	fmt.Printf("File Path: %s\n", response.FilePath)
-	fmt.Printf("Changes Count: %d\n", response.ChangesCount)
-	fmt.Printf("Lines Changed: %d\n", response.LinesChanged)
+	fmt.Println(response.Message)
 
 	return nil
 }
