@@ -16,6 +16,10 @@ import (
 	"github.com/xhd2015/llm-tools/tools/defs"
 )
 
+var presetEnvs = []string{
+	"NO_COLOR=1", // this disables jq's output color
+}
+
 // RunBashScriptRequest represents the input parameters for the run_bash_script tool
 type RunBashScriptRequest struct {
 	Cwd         string `json:"cwd"`
@@ -69,7 +73,7 @@ func RunBashScript(req RunBashScriptRequest) (*RunBashScriptResponse, error) {
 
 	// Validate input parameters
 	if req.Script == "" {
-		return nil, fmt.Errorf("command is required")
+		return nil, fmt.Errorf("requires script")
 	}
 
 	startTime := time.Now()
@@ -87,6 +91,7 @@ func RunBashScript(req RunBashScriptRequest) (*RunBashScriptResponse, error) {
 
 	// Set working directory
 	cmd.Dir = req.Cwd
+	cmd.Env = append(os.Environ(), presetEnvs...)
 
 	// Run command in foreground
 	err := runBash(cmd, response)
