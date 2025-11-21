@@ -25,6 +25,9 @@ type RunBashScriptRequest struct {
 	Cwd         string `json:"cwd"`
 	Script      string `json:"script"`
 	Explanation string `json:"explanation,omitempty"`
+
+	// hidden params
+	CleanOutput *bool `json:"clean_output,omitempty"`
 }
 
 // RunBashScriptResponse represents the output of the run_bash_script tool
@@ -81,12 +84,23 @@ func RunBashScript(req RunBashScriptRequest) (*RunBashScriptResponse, error) {
 	// Prepare response
 	response := &RunBashScriptResponse{}
 
+	var cleanOutput bool
+	if req.CleanOutput != nil && *req.CleanOutput {
+		cleanOutput = true
+	}
+
 	// Prepare command for execution
 	var cmd *exec.Cmd
 	if runtime.GOOS == "windows" {
 		cmd = exec.Command("cmd", "/C", req.Script)
 	} else {
-		cmd = exec.Command("bash", "-c", req.Script)
+		// For non-Windows, wrap the script with an alias to intercept ls -l
+		// This is more token-efficient as -l produces verbose output
+		script := req.Script
+		if cleanOutput {
+			script = wrapScriptWithLsAlias(req.Script)
+		}
+		cmd = exec.Command("bash", "-c", script)
 	}
 
 	// Set working directory
@@ -94,7 +108,7 @@ func RunBashScript(req RunBashScriptRequest) (*RunBashScriptResponse, error) {
 	cmd.Env = append(os.Environ(), presetEnvs...)
 
 	// Run command in foreground
-	err := runBash(cmd, response)
+	err := runBash(cmd, response, cleanOutput)
 	if err != nil {
 		response.Error = err.Error()
 		if exitError, ok := err.(*exec.ExitError); ok {
@@ -116,7 +130,7 @@ func RunBashScript(req RunBashScriptRequest) (*RunBashScriptResponse, error) {
 }
 
 // runBash executes a command in the foreground and captures output
-func runBash(cmd *exec.Cmd, response *RunBashScriptResponse) error {
+func runBash(cmd *exec.Cmd, response *RunBashScriptResponse, cleanOutput bool) error {
 	// Create pipes for stdout and stderr
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -175,6 +189,11 @@ func runBash(cmd *exec.Cmd, response *RunBashScriptResponse) error {
 	// Get the output
 	output := outputBuilder.String()
 
+	// Try to compress JSON if the output is valid JSON
+	if cleanOutput {
+		output = tryCompressJSON(output)
+	}
+
 	origLen := len(output)
 	log.Printf("script completed, output len: %d", origLen)
 
@@ -203,28 +222,6 @@ func appendHint(hint string, s string) string {
 		return hint
 	}
 	return hint + "\n" + s
-}
-
-// getShell determines the appropriate shell to use
-func getShell() string {
-	if runtime.GOOS == "windows" {
-		return "cmd"
-	}
-
-	// Check for SHELL environment variable
-	if shell := os.Getenv("SHELL"); shell != "" {
-		return shell
-	}
-
-	// Default shells by OS
-	switch runtime.GOOS {
-	case "darwin":
-		return "/bin/bash"
-	case "linux":
-		return "/bin/bash"
-	default:
-		return "/bin/sh"
-	}
 }
 
 // ValidateCommand performs basic validation on the command
@@ -322,4 +319,73 @@ func ellipse(msg string, maxLen int) (string, bool) {
 		return msg, false
 	}
 	return string(runes[:maxLen]) + "...", true
+}
+
+// wrapScriptWithLsAlias wraps the script with a bash function and alias that intercepts ls
+// and removes the -l flag for token efficiency
+func wrapScriptWithLsAlias(script string) string {
+	// Define a bash function ls_without_l that removes -l flag
+	// Then alias ls to use this function
+	// Note: shopt -s expand_aliases is required for aliases to work in non-interactive shells
+	lsSetup := `shopt -s expand_aliases
+ls_without_l() {
+    local args=()
+    for arg in "$@"; do
+        # Remove -l from flags
+        if [[ "$arg" == "-l" ]]; then
+            continue
+        elif [[ "$arg" =~ ^-.*l.*$ ]]; then
+            # Remove 'l' from combined flags like -la, -lh, -ltr
+            local new_arg="${arg//l/}"
+            if [[ "$new_arg" != "-" && -n "$new_arg" ]]; then
+                args+=("$new_arg")
+            fi
+        else
+            args+=("$arg")
+        fi
+    done
+    command ls "${args[@]}"
+}
+alias ls='ls_without_l'`
+
+	// Wrap the user script with the ls setup
+	return lsSetup + "\n" + script
+}
+
+// tryCompressJSON attempts to compress JSON output by removing whitespace
+// If the input is not valid JSON, it returns the original string
+func tryCompressJSON(s string) string {
+	// Quick check: if it doesn't start with { or [, it's probably not JSON
+	trimmed := strings.TrimSpace(s)
+	if len(trimmed) == 0 || (trimmed[0] != '{' && trimmed[0] != '[') {
+		return s
+	}
+
+	// Try to parse as JSON using Decoder with UseNumber for safe number handling
+	var data interface{}
+	decoder := json.NewDecoder(strings.NewReader(trimmed))
+	decoder.UseNumber() // Preserve number precision
+	if err := decoder.Decode(&data); err != nil {
+		// Not valid JSON, return original
+		return s
+	}
+
+	// Re-marshal without indentation (compact)
+	compressed, err := json.Marshal(data)
+	if err != nil {
+		// Failed to marshal, return original
+		return s
+	}
+
+	compressedStr := string(compressed)
+	origLen := len(s)
+	newLen := len(compressedStr)
+
+	// Only use compressed version if it's actually smaller
+	if newLen < origLen {
+		log.Printf("Compressed JSON from %d to %d bytes (%.1f%% reduction)", origLen, newLen, float64(origLen-newLen)/float64(origLen)*100)
+		return compressedStr
+	}
+
+	return s
 }
