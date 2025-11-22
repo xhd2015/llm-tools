@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"runtime"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -26,8 +27,17 @@ type RunBashScriptRequest struct {
 	Script      string `json:"script"`
 	Explanation string `json:"explanation,omitempty"`
 
+	RunBashScriptRequestOptions
+}
+
+type RunBashScriptRequestOptions struct {
 	// hidden params
 	CleanOutput *bool `json:"clean_output,omitempty"`
+
+	// the bash trap DEBUG
+	TrapRunCommand func(log string) `json:"-"`
+	// the bash script trap ERR
+	TrapCommandError func(log string) `json:"-"`
 }
 
 // RunBashScriptResponse represents the output of the run_bash_script tool
@@ -89,6 +99,8 @@ func RunBashScript(req RunBashScriptRequest) (*RunBashScriptResponse, error) {
 		cleanOutput = true
 	}
 
+	scriptSetup := &scriptFilesSetup{}
+
 	// Prepare command for execution
 	var cmd *exec.Cmd
 	if runtime.GOOS == "windows" {
@@ -96,16 +108,49 @@ func RunBashScript(req RunBashScriptRequest) (*RunBashScriptResponse, error) {
 	} else {
 		// For non-Windows, wrap the script with an alias to intercept ls -l
 		// This is more token-efficient as -l produces verbose output
-		script := req.Script
+		// -e: exit on error
+		// -u: exit on undefined variable
+		// -o pipefail: exit on error in a pipeline
+		scriptSetup.setups = append(scriptSetup.setups, "set -eo pipefail")
 		if cleanOutput {
-			script = wrapScriptWithLsAlias(req.Script)
+			scriptSetup.setups = append(scriptSetup.setups, wrapScriptWithLsAlias())
 		}
+
+		if req.TrapCommandError != nil {
+			err := scriptSetup.addSetup(trapCommandError, func(line string) {
+				log.Printf("trapCommandError: %s", line)
+				req.TrapCommandError(line)
+			})
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		if req.TrapRunCommand != nil {
+			err := scriptSetup.addSetup(trapDebugCommand, func(line string) {
+				log.Printf("trapDebugCommand: %s", line)
+				req.TrapRunCommand(line)
+			})
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		prefix := strings.Join(scriptSetup.setups, "\n")
+		if prefix != "" {
+			prefix = prefix + "\n"
+		}
+
+		// common options
+		script := prefix + req.Script
+		// log.Printf("actual script: %s", script)
 		cmd = exec.Command("bash", "-c", script)
 	}
 
 	// Set working directory
 	cmd.Dir = req.Cwd
 	cmd.Env = append(os.Environ(), presetEnvs...)
+	cmd.ExtraFiles = scriptSetup.extraFiles
 
 	// Run command in foreground
 	err := runBash(cmd, response, cleanOutput)
@@ -118,15 +163,68 @@ func RunBashScript(req RunBashScriptRequest) (*RunBashScriptResponse, error) {
 		}
 	}
 
+	// close write files,
+	scriptSetup.closeWrite()
+
 	// Calculate duration
 	duration := time.Since(startTime)
 	if duration > 1*time.Second {
 		response.Duration = duration.String()
 	}
 
+	// wait for all setup to finish
+	scriptSetup.wait()
+
 	log.Printf("script completed, final response length: %d", len(response.Output))
 
 	return response, nil
+}
+
+const _BASE_FILE_FD = 2
+
+type scriptFilesSetup struct {
+	wg         sync.WaitGroup
+	extraFiles []*os.File
+	setups     []string
+}
+
+func (c *scriptFilesSetup) addSetup(getSetup func(fd int) string, onLineOutput func(line string)) error {
+	reader, writer, err := os.Pipe()
+	if err != nil {
+		log.Printf("failed to create pipe: %v", err)
+		return fmt.Errorf("failed to create pipe: %w", err)
+	}
+	c.extraFiles = append(c.extraFiles, writer)
+	bashExtraFD := _BASE_FILE_FD + len(c.extraFiles)
+	setup := getSetup(bashExtraFD)
+	c.setups = append(c.setups, setup)
+	c.wg.Add(1)
+
+	go func() {
+		defer c.wg.Done()
+
+		// read line by line
+		scanner := bufio.NewScanner(reader)
+		for scanner.Scan() {
+			line := scanner.Text()
+			onLineOutput(line)
+		}
+		// ignore any error
+		if err := scanner.Err(); err != nil {
+			log.Printf("error reading from pipe: %v", err)
+		}
+	}()
+	return nil
+}
+
+func (c *scriptFilesSetup) closeWrite() {
+	for _, file := range c.extraFiles {
+		file.Close()
+	}
+}
+
+func (c *scriptFilesSetup) wait() {
+	c.wg.Wait()
 }
 
 // runBash executes a command in the foreground and captures output
@@ -323,7 +421,7 @@ func ellipse(msg string, maxLen int) (string, bool) {
 
 // wrapScriptWithLsAlias wraps the script with a bash function and alias that intercepts ls
 // and removes the -l flag for token efficiency
-func wrapScriptWithLsAlias(script string) string {
+func wrapScriptWithLsAlias() string {
 	// Define a bash function ls_without_l that removes -l flag
 	// Then alias ls to use this function
 	// Note: shopt -s expand_aliases is required for aliases to work in non-interactive shells
@@ -349,7 +447,15 @@ ls_without_l() {
 alias ls='ls_without_l'`
 
 	// Wrap the user script with the ls setup
-	return lsSetup + "\n" + script
+	return lsSetup
+}
+
+func trapDebugCommand(fd int) string {
+	return fmt.Sprintf(`trap 'echo "$BASH_COMMAND" >&%d' DEBUG`, fd)
+}
+
+func trapCommandError(fd int) string {
+	return fmt.Sprintf(`trap 'echo "$BASH_COMMAND; EXIT_CODE=$?" >&%d' ERR`, fd)
 }
 
 // tryCompressJSON attempts to compress JSON output by removing whitespace
